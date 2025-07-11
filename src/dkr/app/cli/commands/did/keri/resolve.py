@@ -6,7 +6,7 @@ dkr.app.cli.commands module
 
 import argparse
 import json
-import sys
+import logging
 
 from hio.base import doing
 from keri.app import habbing, oobiing
@@ -14,6 +14,7 @@ from keri.app.cli.common import existing
 from keri.db import basing
 from keri.help import helping
 
+from dkr import log_name, ogler
 from dkr.core import didding
 
 parser = argparse.ArgumentParser(description='Resolve a did:keri DID')
@@ -35,9 +36,20 @@ parser.add_argument(
     required=False,
     default=None,
 )
+parser.add_argument(
+    '--loglevel',
+    action='store',
+    required=False,
+    default='CRITICAL',
+    help='Set log level to DEBUG | INFO | WARNING | ERROR | CRITICAL. Default is CRITICAL',
+)
+
+logger = ogler.getLogger(log_name)
 
 
 def handler(args):
+    ogler.level = logging.getLevelName(args.loglevel.upper())
+    logger.setLevel(ogler.level)
     hby = existing.setupHby(name=args.name, base=args.base, bran=args.bran)
     hbyDoer = habbing.HaberyDoer(habery=hby)  # setup doer
     obl = oobiing.Oobiery(hby=hby)
@@ -46,37 +58,39 @@ def handler(args):
 
 
 class KeriResolver(doing.DoDoer):
-    def __init__(self, hby, hbyDoer, obl, did, oobi, meta):
-        self.hby = hby
-        self.did = did
-        self.oobi = oobi
-        self.meta = meta
+    """Resolve did:keri DID document from the KEL retrieved during OOBI resolution of the provided OOBI."""
 
+    def __init__(self, hby, hbyDoer, obl, did, oobi, meta):
+        self.hby: habbing.Habery = hby
+        self.did: str = did
+        self.oobi: str = oobi
+        self.meta: bool = meta
+
+        self.result: dict = {}
         self.toRemove = [hbyDoer] + obl.doers
-        doers = list(self.toRemove) + [doing.doify(self.resolve)]
+        doers = list(self.toRemove)
         super(KeriResolver, self).__init__(doers=doers)
 
-    def resolve(self, tymth, tock=0.0, **opts):
-        self.wind(tymth)
-        self.tock = tock
-        _ = yield self.tock
+    def recur(self, tock=0.0, **opts):
+        self.resolve(hby=self.hby, did=self.did, oobi=self.oobi, meta=self.meta, tock=tock)
+        return True
 
-        aid = didding.parseDIDKeri(self.did)
-        print(f'From arguments got aid: {aid}', file=sys.stderr)
-        print(f'From arguments got oobi: {self.oobi}', file=sys.stderr)
-
+    def resolve_oobi(self, hby: habbing.Habery, aid: str, oobi: str, tock=0.0):
+        """Resolve the OOBI to retrieve the KEL."""
         obr = basing.OobiRecord(date=helping.nowIso8601())
         obr.cid = aid
-        self.hby.db.oobis.pin(keys=(self.oobi,), val=obr)
+        hby.db.oobis.pin(keys=(oobi,), val=obr)
 
-        while self.hby.db.roobi.get(keys=(self.oobi,)) is None:
+        while hby.db.roobi.get(keys=(oobi,)) is None:
             _ = yield tock
 
-        didresult = didding.generateDIDDoc(self.hby, did=self.did, aid=aid, oobi=self.oobi, meta=True)
-        dd = didresult[didding.DD_FIELD]
-        result = didresult if self.meta else dd
-        data = json.dumps(result, indent=2)
+    def resolve(self, hby: habbing.Habery, did: str, oobi: str, meta: bool, tock=0.0):
+        aid = didding.parseDIDKeri(did)
+        self.resolve_oobi(hby=hby, aid=aid, oobi=oobi, tock=tock)
 
-        print(data)
+        didresult = didding.generateDIDDoc(hby, did=did, aid=aid, oobi=oobi, meta=meta)
+        dd = didresult[didding.DD_FIELD]
+        result = didresult if meta else dd
+        self.result = result
+        logger.info(f'did:keri Resolution result: {result}')
         self.remove(self.toRemove)
-        return result

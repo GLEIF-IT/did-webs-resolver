@@ -9,7 +9,7 @@ from dkr.core.ends.keri_cesr_resource_end import KeriCesrResourceEnd
 
 
 def setup(app, hby):
-    """Set up webbing endpoints to serve configured KERI AIDs as `did:web` DIDs
+    """Set up web app endpoints to serve configured KERI AIDs as `did:web` DIDs
 
     Parameters:
         app (App): Falcon app to register endpoints against

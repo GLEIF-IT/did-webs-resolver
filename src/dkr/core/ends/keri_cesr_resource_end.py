@@ -13,6 +13,10 @@ CESR_MIME = 'application/cesr'
 
 
 class KeriCesrResourceEnd:
+    """
+    keri.cesr resource endpoint for accessing all KEL, TEL, and ACDC artifacts needed for did:webs DIDs
+    """
+
     def __init__(self, hby):
         """
         Parameters:
@@ -40,11 +44,12 @@ class KeriCesrResourceEnd:
 
         content = bytearray()
         for msg in self.hby.db.clonePreIter(pre=aid):
-            serder = serdering.SerderKERI(raw=msg)
-            atc = msg[serder.size :]
-            content = serder.raw.decode('utf-8') + atc.decode('utf-8')
+            content.extend(msg)
+
+        # TODO add in ACDC and TEL artifacts for designated aliases
 
         hab = self.hby.habs[aid]
+
         msgs = bytearray()
         for eid in hab.kever.wits:
             if eid == aid:
@@ -57,7 +62,7 @@ class KeriCesrResourceEnd:
             msgs.extend(hab.loadLocScheme(eid=eid) or bytearray())
             msgs.extend(hab.loadEndRole(cid=aid, eid=eid, role=erole) or bytearray())
 
-        content += msgs.decode('utf-8')
+        content.extend(msgs)
         rep.status = falcon.HTTP_200
         rep.content_type = CESR_MIME
-        rep.data = content.encode('utf-8')
+        rep.data = content

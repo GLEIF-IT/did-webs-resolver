@@ -5,10 +5,12 @@ dkr.app.cli.commands module
 """
 
 import argparse
+import logging
 
 from keri.app import configing, directing, habbing, keeping, oobiing
 from keri.app.cli.common import existing
 
+from dkr import log_name, ogler
 from dkr.core import resolving
 
 parser = argparse.ArgumentParser(description='Expose did:keri resolver as an HTTP web service')
@@ -29,9 +31,20 @@ parser.add_argument(
 )  # passcode => bran
 parser.add_argument('--config-dir', '-c', dest='configDir', help='directory override for configuration data', default=None)
 parser.add_argument('--config-file', dest='configFile', action='store', default=None, help='configuration filename override')
+parser.add_argument(
+    '--loglevel',
+    action='store',
+    required=False,
+    default='CRITICAL',
+    help='Set log level to DEBUG | INFO | WARNING | ERROR | CRITICAL. Default is CRITICAL',
+)
+
+logger = ogler.getLogger(log_name)
 
 
 def launch(args, expire=0.0):
+    ogler.level = logging.getLevelName(args.loglevel.upper())
+    logger.setLevel(ogler.level)
     name = args.name
     base = args.base
     bran = args.bran
@@ -59,5 +72,5 @@ def launch(args, expire=0.0):
     doers = obl.doers + [hbyDoer]
     doers += resolving.setup(hby, hbyDoer, obl, httpPort=httpPort)
 
-    print(f'Launched did:keri resolver as an HTTP web service on {httpPort}')
+    logger.info(f'Launched did:keri resolver as an HTTP web service on {httpPort}')
     return doers

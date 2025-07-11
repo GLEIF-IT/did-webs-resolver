@@ -6,25 +6,26 @@ Thank you to Markus Sabadello @peacekeeper from DanubeTech who created the origi
 
 If you're running into trouble in the process below, be sure to check the section [Trouble Shooting](#trouble-shooting) below. 
 
-Let's get started! We'll use docker to setup and run in a simple environment. If you haven't installed docker on your system yet, first [get it](https://docs.docker.com/get-docker/)
+Let's get started! We'll use docker to set up and run in a simple environment. If you haven't installed docker on your system yet, first [get it](https://docs.docker.com/get-docker/)
 
 ## Run locally
 
 Start your witness pool.
-```
+```bash
 dkr did webs resolver-service --config-dir=./scripts
 ```
 
 ## Run Docker build
+
 Go the root of did-webs-resolver reference implementation repo on your local machine. Then:
 
-```
+```bash
 docker compose build --no-cache
 ```
 
 ## Run Docker containers for the keri witness network and the `did:webs` generator and resolver environment
 
-```
+```bash
 docker compose down
 docker compose up -d
 ```
@@ -36,28 +37,37 @@ docker compose exec webs /bin/bash
 ```
 
 ## Create your KERI identifier
-* You can manually execute the following commands to create your KERI identifier that secures your did:webs DID.
-* OR you can run the script `./get_started_docker.sh` will run the commands for you.
 
-### Create a cryptographic salt to secure your KERI identifier
-```
+Alternate paths:
+
+1. You can manually execute the following commands to create your KERI identifier that secures your did:webs DID.
+2. OR you can run the script `./get_started_docker.sh` will run the commands for you.
+
+### Step 1: Create a cryptographic salt to secure your KERI identifier
+
+```bash
 kli salt
 ```
 The example salt we use in the scripts:
-```
+```text
 0AAQmsjh-C7kAJZQEzdrzwB7
 ```
 
 
-### Create the KERI AID ```ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe```
-#### initialize your environment with a name, salt, and config file
+### Step 2: Create the KERI AID `ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe`
 
-`command:`
-```
-kli init --name controller --salt 0AAQmsjh-C7kAJZQEzdrzwB7 --nopasscode --config-dir /usr/local/var/webs/volume/dkr/examples/my-scripts --config-file config-docker
+#### Initialize KERI environment with name, salt, and config file
+
+**command**:
+```bash
+kli init --name controller \
+  --salt 0AAQmsjh-C7kAJZQEzdrzwB7 \
+  --nopasscode \
+  --config-dir /usr/local/var/webs/volume/dkr/examples/my-scripts \
+  --config-file config-docker
 ```
 
-```output:```
+**output**:
 ```
 KERI Keystore created at: /usr/local/var/keri/ks/controller
 KERI Database created at: /usr/local/var/keri/db/controller
@@ -133,51 +143,62 @@ Note: Replace with your actual web address and AID
 
 You should pick the web address (host, optional port, optional path) where you will host the did:webs identifier. For this example we'll use the docker service we've created at host `did-webs-service` and with optional port `7676`. NOTE the spec requires the colon `:` before an optional port to be encoded as `%3a` in the did:webs identifier.
 
-`command:`
-```
-dkr did webs generate --name controller --did "did:webs:did-webs-service%3a7676:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe"
+**command**:
+```bash
+dkr did webs generate \
+  --name hyperledger \
+  --did "did:webs:localhost%3A7677:dws:EBFn5ge82EQwxp9eeje-UMEXF-v-3dlfbdVMX_PNjSft" \
+  --verbose True \
+  --output-dir ./local-web/dws
 ```
 
-`output:`
-```
-Generating CESR event stream data from hab
-Generating ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe KEL CESR events
-Writing CESR events to ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe/keri.cesr: 
-{"v":"KERI10JSON00012b_","t":"icp","d":"ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe","i":"ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe","s":"0","kt":"1","k":["DHr0-I-mMN7h6cLMOTRJkkfPuMd0vgQPrOk4Y3edaHjr"],"nt":"1","n":["ELa775aLyane1vdiJEuexP8zrueiIoG995pZPGJiBzGX"],"bt":"0","b":[],"c":[],"a":[]}-VAn-AABAADjfOjbPu9OWce59OQIc-y3Su4kvfC2BAd_e_NLHbXcOK8-3s6do5vBfrxQ1kDyvFGCPMcSl620dLMZ4QDYlvME-EAB0AAAAAAAAAAAAAAAAAAAAAAA1AAG2023-12-26T20c12c58d336072p00c00
+**output**:
+```text
+keri.cesr:
+{"v":"KERI10JSON000159_","t":"icp","d":"EBFn5ge82EQwxp9eeje-UMEXF-v-3dlfbdVMX_PNjSft","i":"EBFn5ge82EQwxp9eeje-UMEXF-v-3dlfbdVMX_PNjSft","s":"0","kt":"1","k":["DLocH0g8QYMUqaxn7UcxQbiy-vp5m_1LQY4DsHu0CRrw"],"nt":"1","n":["ENMNLTi8meis1ApCJSfl_N4rTEAAsSkyvRON4RYH_xpM"],"bt":"1","b":["BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha"],"c":[],"a":[]}-VA--AABAAAoEAhe-by7Jxh4dgnoDoCmz0e6wXfju4pnT_rrlQE7QLPkK2lqX6iMBgwsT-WYCFMNpFZ9HwiBSWLe0s6dFh8N-BABAADG08mCFRezDfMa_Wlv2A7tA17nwxaGjKvfEWu9zLdeFBHWOOk-DQudBbqUmKsbBuViuBi5Col-FZ4ECSlTatEO-EAB0AAAAAAAAAAAAAAAAAAAAAAA1AAG2025-07-10T18c39c02d053508p00c00
 
-  "didDocument": {
-    "id": "did:web:did-webs-service%3a7676:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
-    "verificationMethod": [
-      {
-        "id": "#DHr0-I-mMN7h6cLMOTRJkkfPuMd0vgQPrOk4Y3edaHjr",
-        "type": "JsonWebKey",
-        "controller": "did:web:did-webs-service%3a7676:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
-        "publicKeyJwk": {
-          "kid": "DHr0-I-mMN7h6cLMOTRJkkfPuMd0vgQPrOk4Y3edaHjr",
-          "kty": "OKP",
-          "crv": "Ed25519",
-          "x": "evT4j6Yw3uHpwsw5NEmSR8-4x3S-BA-s6Thjd51oeOs"
-        }
+did.json:
+{
+  "id": "did:web:localhost%3A7677:dws:EBFn5ge82EQwxp9eeje-UMEXF-v-3dlfbdVMX_PNjSft",
+  "verificationMethod": [
+    {
+      "id": "#DLocH0g8QYMUqaxn7UcxQbiy-vp5m_1LQY4DsHu0CRrw",
+      "type": "JsonWebKey",
+      "controller": "did:web:localhost%3A7677:dws:EBFn5ge82EQwxp9eeje-UMEXF-v-3dlfbdVMX_PNjSft",
+      "publicKeyJwk": {
+        "kid": "DLocH0g8QYMUqaxn7UcxQbiy-vp5m_1LQY4DsHu0CRrw",
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "uhwfSDxBgxSprGftRzFBuLL6-nmb_UtBjgOwe7QJGvA"
       }
-    ],
-    "service": [],
-    "alsoKnownAs": []
-  }
-  ... with additional output continuing...
+    }
+  ],
+  "service": [
+    {
+      "id": "#BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha/witness",
+      "type": "witness",
+      "serviceEndpoint": {
+        "http": "http://127.0.0.1:5642/",
+        "tcp": "tcp://127.0.0.1:5632/"
+      }
+    }
+  ],
+  "alsoKnownAs": []
+}
 ```
 
-This creates files `did.json` and `keri.cesr` under local path `./volume/dkr/examples/<your AID>/did.json`
+This creates files `did.json` and `keri.cesr` under local path `./local-web/dws/<your AID>/`
 
 You can access these files either from within your Docker container or on your local computer filesystem.
-- `<local path on computer to did-webs-resolver>/volume/dkr/examples/<your AID>` (local path on your computer)
-- `/usr/local/var/webs/volume/dkr/examples/<your AID>` (local path in the Docker container)
+- `<local path on computer to did-webs-resolver>/local-web/dws/<your AID>/` (local path on your computer)
+- `/usr/local/var/local-web/dws/<your AID>/` (local path in the Docker container)
 
-`command:`
-```
+**command**:
+```bash
 cat ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe/did.json
 ```
 
-`output:`
+**output**:
 ```
 {"id": "did:web:did-webs-service%3a7676:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe", "verificationMethod": [{"id": "#DHr0-I-mMN7h6cLMOTRJkkfPuMd0vgQPrOk4Y3edaHjr", "type": "JsonWebKey", "controller": "did:web:did-webs-service%3a7676:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe", "publicKeyJwk": {"kid": "DHr0-I-mMN7h6cLMOTRJkkfPuMd0vgQPrOk4Y3edaHjr", "kty": "OKP", "crv": "Ed25519", "x": "evT4j6Yw3uHpwsw5NEmSR8-4x3S-BA-s6Thjd51oeOs"}}], "service": [], "alsoKnownAs": []}
 ```
@@ -196,38 +217,40 @@ First, lets copy our generated files to the directory we'll serve from. On your
 
 For this demo these files have been copied ahead of time for you.
 
-```
+```bash
 cp -R volume/dkr/examples/ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe volume/dkr/pages/ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe
 ```
 
 Now lets go into our did-webs-service docker container:
-```
+```bash
 docker compose exec did-webs-service /bin/bash
 ```
 
-```
+```bash
 dkr did webs service --name webserve --config-dir /usr/local/var/webs/volume/dkr/examples/my-scripts --config-file config-docker
 ```
 
 It will search for AID named directories and for the two files (`did.json` and `keri.cesr`) under those directories. The search occurs from the directory specified in the config-file properties:
-```
-    "keri.cesr.dir": "/usr/local/var/webs/volume/dkr/pages/",
-    "did.doc.dir": "/usr/local/var/webs/volume/dkr/pages/"
+```json
+{
+  "keri.cesr.dir": "/usr/local/var/webs/volume/dkr/pages/",
+  "did.doc.dir": "/usr/local/var/webs/volume/dkr/pages/"
+}
 ```
 
 It will serve it at a URL that you can CURL from any of our docker containers (for instance from the webs container) like:
 
-`command:`
-```
+**command**:
+```bash
 curl -GET http://did-webs-service:7676/ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe/did.json
 ```
 OR from your browser navigate to:
-```
+```text
 http://127.0.0.1:7676/ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe/did.json
 ```
 
-`output:`
-```
+**output**:
+```json
 {
   "id": "did:web:did-webs-service%3a7676:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
   "verificationMethod": [
@@ -248,16 +271,16 @@ http://127.0.0.1:7676/ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe/did.json
 }
 ```
 
-`command:`
-```
+**command**:
+```bash
 curl -GET http://did-webs-service:7676/ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe/keri.cesr
 ```
 OR from your browser navigate to:
-```
+```text
 http://127.0.0.1:7676/ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe/keri.cesr
 ```
 
-`KERI CESR output:`
+**KERI CESR output**:
 ```json
 "{\"v\":\"KERI10JSON00012b_\",\"t\":\"icp\",\"d\":\"ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe\",\"i\":\"ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe\",\"s\":\"0\",\"kt\":\"1\",\"k\":[\"DHr0-I-mMN7h6cLMOTRJkkfPuMd0vgQPrOk4Y3edaHjr\"],\"nt\":\"1\",\"n\":[\"ELa775aLyane1vdiJEuexP8zrueiIoG995pZPGJiBzGX\"],\"bt\":\"0\",\"b\":[],\"c\":[],\"a\":[]}-VAn-AABAADjfOjbPu9OWce59OQIc-y3Su4kvfC2BAd_e_NLHbXcOK8-3s6do5vBfrxQ1kDyvFGCPMcSl620dLMZ4QDYlvME-EAB0AAAAAAAAAAAAAAAAAAAAAAA1AAG2024-01-02T14c12c15d456835p00c00"
 ```
