@@ -6,13 +6,18 @@ dkr.core.webbing module
 
 import falcon
 from keri import kering
-from keri.core import serdering
+from keri.app import habbing
+from keri.db import basing
 
 KERI_CESR = 'keri.cesr'
 CESR_MIME = 'application/cesr'
 
 
 class KeriCesrResourceEnd:
+    """
+    keri.cesr resource endpoint for accessing all KEL, TEL, and ACDC artifacts needed for did:webs DIDs
+    """
+
     def __init__(self, hby):
         """
         Parameters:
@@ -38,26 +43,37 @@ class KeriCesrResourceEnd:
         if aid not in self.hby.kevers:
             raise falcon.HTTPNotFound(description=f'KERI AID {aid} not found')
 
-        content = bytearray()
-        for msg in self.hby.db.clonePreIter(pre=aid):
-            serder = serdering.SerderKERI(raw=msg)
-            atc = msg[serder.size :]
-            content = serder.raw.decode('utf-8') + atc.decode('utf-8')
-
+        baser = self.hby.db
         hab = self.hby.habs[aid]
-        msgs = bytearray()
-        for eid in hab.kever.wits:
-            if eid == aid:
-                pass
-            else:
-                msgs.extend(hab.loadLocScheme(eid=eid) or bytearray())
-                msgs.extend(hab.makeEndRole(eid=eid, role=kering.Roles.witness) or bytearray())
+        content = load_kel(baser, aid)
+        roles_and_urls = load_end_roles_loc_schemes(baser, hab, aid)
+        content.extend(roles_and_urls)
+        # TODO add in ACDC and TEL artifacts for designated aliases
 
-        for (_, erole, eid), _ in self.hby.db.ends.getItemIter(keys=(aid, kering.Roles.mailbox)):
-            msgs.extend(hab.loadLocScheme(eid=eid) or bytearray())
-            msgs.extend(hab.loadEndRole(cid=aid, eid=eid, role=erole) or bytearray())
-
-        content += msgs.decode('utf-8')
         rep.status = falcon.HTTP_200
         rep.content_type = CESR_MIME
-        rep.data = content.encode('utf-8')
+        rep.data = content
+
+
+def load_kel(baser: basing.Baser, aid: str) -> bytearray:
+    """Load KEL messages for the given AID."""
+    msgs = bytearray()
+    for msg in baser.clonePreIter(pre=aid):
+        msgs.extend(msg)
+    return msgs
+
+
+def load_end_roles_loc_schemes(baser: basing.Baser, hab: habbing.Hab, aid: str) -> bytearray:
+    """Load endpoint role and location scheme messages for the given AID."""
+    msgs = bytearray()
+    for eid in hab.kever.wits:
+        if eid == aid:
+            pass
+        else:
+            msgs.extend(hab.loadLocScheme(eid=eid) or bytearray())
+            msgs.extend(hab.makeEndRole(eid=eid, role=kering.Roles.witness) or bytearray())
+
+    for (_, erole, eid), _ in baser.ends.getItemIter(keys=(aid, kering.Roles.mailbox)):
+        msgs.extend(hab.loadLocScheme(eid=eid) or bytearray())
+        msgs.extend(hab.loadEndRole(cid=aid, eid=eid, role=erole) or bytearray())
+    return msgs

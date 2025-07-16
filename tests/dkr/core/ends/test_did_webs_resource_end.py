@@ -17,7 +17,7 @@ def test_did_web_resource_end_on_get():
     req.host = 'example.com'
     req.port = 80
 
-    when(didding).generateDIDDoc(hby, 'did:web:example.com:test_aid', 'test_aid').thenReturn({'mocked': 'data'})
+    when(didding).generate_did_doc(hby, 'did:web:example.com:test_aid', 'test_aid').thenReturn({'mocked': 'data'})
 
     resource = DIDWebsResourceEnd(hby)
     resource.on_get(req, rep, 'test_aid')
@@ -39,7 +39,7 @@ def test_did_web_resource_end_on_get_odd_port():
     req.host = 'example.com'
     req.port = 42
 
-    when(didding).generateDIDDoc(hby, 'did:web:example.com%3A42:test_aid', 'test_aid').thenReturn({'mocked': 'data'})
+    when(didding).generate_did_doc(hby, 'did:web:example.com%3A42:test_aid', 'test_aid').thenReturn({'mocked': 'data'})
 
     resource = DIDWebsResourceEnd(hby)
     resource.on_get(req, rep, 'test_aid')

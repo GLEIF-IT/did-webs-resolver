@@ -7,20 +7,23 @@ dkr.core.serving module
 import json
 import os
 import queue
-import sys
 
 import falcon
 import requests
 from hio.base import doing
 from hio.core import http
-from keri.app import habbing
+from keri.app import directing, habbing
 
+from dkr import log_name, ogler
+from dkr.app.cli.commands.did.keri.resolve import KeriResolver
 from dkr.core import didding, ends
 
+logger = ogler.getLogger(log_name)
 
-def getSrcs(did: str, resq: queue.Queue = None):
-    print(f'Parsing DID {did}')
-    domain, port, path, aid = didding.parseDIDWebs(did=did)
+
+def get_sources(did: str, resq: queue.Queue = None):
+    logger.info(f'Parsing DID {did}')
+    domain, port, path, aid = didding.parse_did_webs(did=did)
 
     opt_port = f':{port}' if port is not None else ''
     opt_path = f'/{path.replace(":", "/")}' if path is not None else ''
@@ -28,15 +31,15 @@ def getSrcs(did: str, resq: queue.Queue = None):
 
     # Load the did doc
     dd_url = f'{base_url}/{ends.DID_JSON}'
-    print(f'Loading DID Doc from {dd_url}')
-    dd_res = loadUrl(dd_url, resq=resq)
-    print(f'Got DID doc: {dd_res.content.decode("utf-8")}')
+    logger.info(f'Loading DID Doc from {dd_url}')
+    dd_res = load_url(dd_url, resq=resq)
+    logger.debug(f'Got DID doc: {dd_res.content.decode("utf-8")}')
 
     # Load the KERI CESR
     kc_url = f'{base_url}/{ends.KERI_CESR}'
-    print(f'Loading KERI CESR from {kc_url}')
-    kc_res = loadUrl(kc_url, resq=resq)
-    print(f'Got KERI CESR: {kc_res.content.decode("utf-8")}')
+    logger.info(f'Loading KERI CESR from {kc_url}')
+    kc_res = load_url(kc_url, resq=resq)
+    logger.debug(f'Got KERI CESR: {kc_res.content.decode("utf-8")}')
 
     if resq is not None:
         resq.put(aid)
@@ -45,122 +48,146 @@ def getSrcs(did: str, resq: queue.Queue = None):
     return aid, dd_res, kc_res
 
 
-def saveCesr(hby: habbing.Habery, kc_res: requests.Response, aid: str = None):
-    print('Saving KERI CESR to hby', kc_res.content.decode('utf-8'))
+def save_cesr(hby: habbing.Habery, kc_res: requests.Response, aid: str = None):
+    logger.info('Saving KERI CESR to hby: %s', kc_res.content.decode('utf-8'))
     hby.psr.parse(ims=bytearray(kc_res.content))
     if aid:
         assert aid in hby.kevers, f'KERI CESR parsing failed, KERI AID {aid} not found in habery'
 
 
-def getComp(hby: habbing.Habery, did: str, aid: str, dd_res: requests.Response, kc_res: requests.Response):
-    dd = didding.generateDIDDoc(hby, did=did, aid=aid, oobi=None, meta=True)
-    dd[didding.DD_META_FIELD]['didDocUrl'] = dd_res.url
-    dd[didding.DD_META_FIELD]['keriCesrUrl'] = kc_res.url
+def compare_did_docs(
+    hby: habbing.Habery, did: str, aid: str, meta: bool, dd_res: requests.Response, kc_res: requests.Response
+):
+    dd = didding.generate_did_doc(hby, did=did, aid=aid, oobi=None, meta=meta)
+    if meta:
+        dd[didding.DD_META_FIELD]['didDocUrl'] = dd_res.url
+        dd[didding.DD_META_FIELD]['keriCesrUrl'] = kc_res.url
 
-    dd_actual = didding.fromDidWeb(json.loads(dd_res.content.decode('utf-8')))
-    print(f'Got DID Doc: {dd_actual}')
+    dd_actual = didding.from_did_web(json.loads(dd_res.content.decode('utf-8')), meta)
+    logger.debug(f'Got DID Doc: {dd_actual}')
 
     return dd, dd_actual
 
 
-def verify(dd, dd_actual, meta: bool = False):
-    dd_exp = dd
-    if didding.DD_FIELD in dd_exp:
-        dd_exp = dd[didding.DD_FIELD]
-    # TODO verify more than verificationMethod
-    verified = _verifyDidDocs(dd_exp[didding.VMETH_FIELD], dd_actual[didding.VMETH_FIELD])
-
-    result = None
-    if verified:
-        result = dd if meta else dd[didding.DD_FIELD]
-        print(f'DID verified')
-    else:
-        didresult = dict()
-        didresult[didding.DD_FIELD] = None
-        if didding.DID_RES_META_FIELD not in didresult:
-            didresult[didding.DID_RES_META_FIELD] = dict()
-        didresult[didding.DID_RES_META_FIELD]['error'] = 'notVerified'
-        didresult[didding.DID_RES_META_FIELD]['errorMessage'] = (
-            'The DID document could not be verified against the KERI event stream'
-        )
-        result = didresult
-        print(f'DID verification failed')
-
+def error_resolution_response(meta: bool, error_message: str):
+    """
+    Generate an error response for DID resolution.
+    """
+    didresult = dict()
+    didresult[didding.DD_FIELD] = None
+    if didding.DID_RES_META_FIELD not in didresult:
+        didresult[didding.DID_RES_META_FIELD] = dict()
+    didresult[didding.DID_RES_META_FIELD]['error'] = 'notVerified'
+    didresult[didding.DID_RES_META_FIELD]['errorMessage'] = error_message
+    result = didresult
     return result
 
 
-def _verifyDidDocs(expected, actual):
+def verify(dd_expected: dict, dd_actual: dict, meta: bool = False) -> (bool, dict):
+    """
+    Verify the DID document against the KERI event stream.
+
+    Returns:
+         tuple(bool, dict): (verified, dd) where verified is a boolean indicating verification status
+    """
+    dd_exp = dd_expected
+    if didding.DD_FIELD in dd_exp:
+        dd_exp = dd_expected[didding.DD_FIELD]
+    # TODO verify more than verificationMethod
+    verified = _verify_did_docs(dd_exp[didding.VMETH_FIELD], dd_actual[didding.VMETH_FIELD])
+
+    if verified:
+        logger.info(f'DID document verified')
+        return (True, dd_expected[didding.DD_FIELD]) if meta else (True, dd_expected)
+    else:
+        logger.info(f'DID document verification failed')
+        return (
+            False,
+            error_resolution_response(
+                meta=meta, error_message='The DID document could not be verified against the KERI event stream'
+            ),
+        )
+
+
+def _verify_did_docs(expected, actual):
     # TODO determine what to do with BADA RUN things like services (witnesses) etc.
-    if expected != actual:
-        print('DID Doc does not verify', file=sys.stderr)
-        _compare_dicts(expected, actual)
+    if (
+        expected != actual
+    ):  # Python != and == perform a deep object value comparison; this is not reference equality, it is value equality
+        differences = _compare_dicts(expected, actual)
+        logger.error(f'Differences found in DID Doc verification: {differences}')
         return False
     else:
-        print('DID Doc verified', file=sys.stderr)
         return True
 
 
 def _compare_dicts(expected, actual, path=''):
-    print(f'Comparing dictionaries:\nexpected:\n{expected}\n \nand\n \nactual:\n{actual}', file=sys.stderr)
+    """Recursively compare two dictionaries and return differences."""
+    logger.error(f'Comparing dictionaries:\nexpected:\n{expected}\n \nand\n \nactual:\n{actual}')
+    differences = []
 
-    """Recursively compare two dictionaries and print differences."""
     if isinstance(expected, dict):
         for k in expected.keys():
             # Construct current path
             current_path = f'{path}.{k}' if path else k
-            print(f'Comparing key {current_path}', file=sys.stderr)
+            logger.error(f'Comparing key {current_path}')
 
             # Key not present in the actual dictionary
             if k not in actual:
-                print(f'Key {current_path} not found in the actual dictionary', file=sys.stderr)
+                differences.append((current_path, expected[k], None))
+                logger.error(f'Key {current_path} not found in the actual dictionary')
                 continue
 
             # If value in expected is a dictionary but not in actual
             if isinstance(expected[k], dict) and not isinstance(actual[k], dict):
-                print(f'{current_path} is a dictionary in expected, but not in actual', file=sys.stderr)
+                differences.append((current_path, expected[k], actual[k]))
+                logger.error(f'{current_path} is a dictionary in expected, but not in actual')
                 continue
 
             # If value in actual is a dictionary but not in expected
             if isinstance(actual[k], dict) and not isinstance(expected[k], dict):
-                print(f'{current_path} is a dictionary in actual, but not in expected', file=sys.stderr)
+                differences.append((current_path, expected[k], actual[k]))
+                logger.error(f'{current_path} is a dictionary in actual, but not in expected')
                 continue
 
             # If value is another dictionary, recurse
             if isinstance(expected[k], dict) and isinstance(actual[k], dict):
-                _compare_dicts(expected[k], actual[k], current_path)
+                differences.append(_compare_dicts(expected[k], actual[k], current_path))
             # Compare non-dict values
             elif expected[k] != actual[k]:
-                print(
-                    f'Different values for key {current_path}: {expected[k]} (expected) vs. {actual[k]} (actual)',
-                    file=sys.stderr,
-                )
+                differences.append((current_path, expected[k], actual[k]))
+                logger.error(f'Different values for key {current_path}: {expected[k]} (expected) vs. {actual[k]} (actual)')
 
         if isinstance(actual, dict):
             # Check for keys in actual that are not present in expected
             for k in actual.keys():
                 current_path = f'{path}.{k}' if path else k
                 if k not in expected:
-                    print(f'Key {current_path} not found in the expected dictionary', file=sys.stderr)
+                    differences.append((current_path, None, actual[k]))
+                    logger.error(f'Key {current_path} not found in the expected dictionary')
         else:
-            print(f'Expecting actual did document to contain dictionary {expected}', file=sys.stderr)
+            differences.append((path, expected, None))
+            logger.error(f'Expecting actual did document to contain dictionary {expected}')
     elif isinstance(expected, list):
         if len(expected) != len(actual):
-            print(f'Expected list {expected} and actual list {actual} are not the same length', file=sys.stderr)
+            differences.append((path, expected, actual))
+            logger.error(f'Expected list {expected} and actual list {actual} are not the same length')
         else:
             for i in range(len(expected)):
-                _compare_dicts(expected[i], actual[i], path)
+                differences.append(_compare_dicts(expected[i], actual[i], path))
     else:
         if expected != actual:
-            print(f'Different values for key {path}: {expected} (expected) vs. {actual} (actual)', file=sys.stderr)
+            differences.append((path, expected, actual))
+            logger.error(f'Different values for key {path}: {expected} (expected) vs. {actual} (actual)')
+    return differences
 
 
 def resolve(hby, did, meta=False, resq: queue.Queue = None):
-    aid, dd_res, kc_res = getSrcs(did=did, resq=resq)
-    saveCesr(hby=hby, kc_res=kc_res, aid=aid)
-    dd, dd_actual = getComp(hby=hby, did=did, aid=aid, dd_res=dd_res, kc_res=kc_res)
-    vresult = verify(dd, dd_actual, meta=meta)
-    print('Resolution result: ', vresult)
-    return vresult
+    """Resolve a did:webs DID and returl the verification result."""
+    aid, dd_res, kc_res = get_sources(did=did, resq=resq)
+    save_cesr(hby=hby, kc_res=kc_res, aid=aid)
+    dd, dd_actual = compare_did_docs(hby=hby, did=did, aid=aid, meta=meta, dd_res=dd_res, kc_res=kc_res)
+    return verify(dd, dd_actual, meta=meta)
 
 
 # # Test with the provided dictionaries
@@ -182,91 +209,105 @@ def resolve(hby, did, meta=False, resq: queue.Queue = None):
 # compare_dicts(expected_dict, actual_dict)
 
 
-def setup(hby, hbyDoer, obl, *, httpPort):
+def setup(hby, hby_doer, oobiery, *, http_port, cf=None, static_files_dir='dws'):
     """Setup serving package and endpoints
 
     Parameters:
         hby (Habery): identifier database environment
-        httpPort (int): external port to listen on for HTTP messages
-
+        hby_doer (HaberyDoer): Doer for the identifier database environment
+        oobiery (Oobiery): OOBI management environment
+        http_port (int): external port to listen on for HTTP messages
+        cf (Configer): configuration object for the serving package
+        static_files_dir (str): directory to serve static files from, default is 'dws'
+    Returns:
+        list: list of Doers to run in the Tymist
     """
-    print(f'Setup resolving')
+    logger.info(f'Setting up Resolver HTTP server Doers on port {http_port}')
     app = falcon.App(
         middleware=falcon.CORSMiddleware(
             allow_origins='*', allow_credentials='*', expose_headers=['cesr-attachment', 'cesr-date', 'content-type']
         )
     )
 
-    server = http.Server(port=httpPort, app=app)
-    httpServerDoer = http.ServerDoer(server=server)
+    server = http.Server(port=http_port, app=app)
+    http_server_doer = http.ServerDoer(server=server)
 
-    loadEnds(app, hby=hby, hbyDoer=hbyDoer, obl=obl)
+    load_ends(app, hby=hby, hby_doer=hby_doer, oobiery=oobiery, static_files_dir=static_files_dir)
 
-    doers = [httpServerDoer]
+    doers = [http_server_doer]
 
     return doers
 
 
-def loadEnds(app, *, hby, hbyDoer, obl, prefix=''):
-    print(f'Loading resolving endpoints')
-    resolveEnd = ResolveResource(hby=hby, hbyDoer=hbyDoer, obl=obl)
-    result = app.add_route('/1.0/identifiers/{did}', resolveEnd)
-    print(f'Loaded resolving endpoints: {app}')
+def load_ends(app, *, hby, hby_doer, oobiery, static_files_dir):
+    # Set up static file serving for did.json and keri.cesr files
+    did_doc_dir = hby.cf.get().get('did.doc.dir', 'dws')
+    if not os.path.isabs(did_doc_dir):
+        did_doc_dir = os.path.join(os.path.abspath(static_files_dir), did_doc_dir)
+    if not os.path.isabs(did_doc_dir):
+        did_doc_dir = os.path.join(os.getcwd(), did_doc_dir)
+    logger.info(f'Serving static files from {did_doc_dir}')
+    app.add_static_route('/dws', did_doc_dir)
 
-    return [resolveEnd]
+    resolve_end = ResolveResource(hby=hby, hby_doer=hby_doer, oobiery=oobiery)
+    app.add_route('/1.0/identifiers/{did}', resolve_end)
+    app.add_route('/health', ends.HealthEnd())
+    return [resolve_end]
 
 
 class ResolveResource(doing.DoDoer):
     """
-    Resource for managing OOBIs
-
+    Resource for resolving did:webs and did:keri DIDs
     """
 
-    def __init__(self, hby, hbyDoer, obl):
+    def __init__(self, hby, hby_doer, oobiery):
         """Create Endpoints for discovery and resolution of OOBIs
 
         Parameters:
             hby (Habery): identifier database environment
-
+            hby_doer (HaberyDoer): Doer for the identifier database environment
+            oobiery (Oobiery): OOBI management environment
         """
         self.hby = hby
-        self.hbyDoer = hbyDoer
-        self.obl = obl
+        self.hby_doer = hby_doer
+        self.oobiery = oobiery
 
         super(ResolveResource, self).__init__(doers=[])
-        print(f'Init resolver endpoint')
 
     def on_get(self, req, rep, did, meta=False):
-        print(f'Request to resolve did: {did}')
+        """
+        Handle GET requests to resolve a DID by its identifier (KERI AID).
+
+        Parameters:
+            req (falcon.Request): The HTTP request object.
+            rep (falcon.Response): The HTTP response object.
+            did (str): The DID to resolve.
+            meta (bool): If True, include metadata in the DID document resolution.
+        """
+        # did = urllib.parse.unquote(did)
+        logger.info(f'Request to resolve did: {did}')
 
         if did is None:
             rep.status = falcon.HTTP_400
-            rep.text = "invalid resolution request body, 'did' is required"
+            rep.content_type = 'application/json'
+            rep.media = {'error': "invalid resolution request body, 'did' is required"}
             return
 
         if 'oobi' in req.params:
             oobi = req.params['oobi']
-            print(f'From parameters {req.params} got oobi: {oobi}')
+            logger.info(f'From parameters {req.params} got oobi: {oobi}')
         else:
             oobi = None
 
-        if did.startswith('did:webs:'):
-            # res = WebsResolver(hby=self.hby, hbyDoer=self.hbyDoer, obl=self.obl, did=did)
-            # tymth = None # ???
-            # data = res.resolve(tymth)
-            cmd = f'dkr did webs resolve --name dkr --did {did} --meta {meta}'
-            stream = os.popen(cmd)
-            data = stream.read()
+        if did.startswith('did:webs'):
+            data = resolve(hby=self.hby, did=did, meta=meta)
         elif did.startswith('did:keri'):
-            # res = KeriResolver(hby=self.hby, hbyDoer=self.hbyDoer, obl=self.obl, did=did, oobi=oobi, metadata=False)
-            # tymth = None # ???
-            # data = res.resolve(tymth)
-            cmd = f'dkr did keri resolve --name dkr --did {did} --oobi {oobi} --meta {meta}'
-            stream = os.popen(cmd)
-            data = stream.read()
+            resolver = KeriResolver(hby=self.hby, hby_doer=self.hby_doer, oobiery=self.oobiery, did=did, oobi=oobi, meta=meta)
+            directing.runController(doers=[resolver], expire=0.0)
+            data = resolver.result
         else:
             rep.status = falcon.HTTP_400
-            rep.text = "invalid 'did'"
+            rep.media = {'error': "invalid 'did'"}
             return
 
         rep.status = falcon.HTTP_200
@@ -276,21 +317,21 @@ class ResolveResource(doing.DoDoer):
         return
 
 
-def loadFile(file_path):
+def load_file(file_path):
     # Read the file in binary mode
     with open(file_path, 'rb') as file:
         msgs = file.read()
         return msgs
 
 
-def loadJsonFile(file_path):
+def load_json_file(file_path):
     # Read the file in binary mode
     with open(file_path, 'r', encoding='utf-8') as file:
         msgs = json.load(file)
         return msgs
 
 
-def loadUrl(url: str, resq: queue.Queue = None):
+def load_url(url: str, resq: queue.Queue = None):
     response = requests.get(url=url)
     # Ensure the request was successful
     response.raise_for_status()
@@ -300,7 +341,7 @@ def loadUrl(url: str, resq: queue.Queue = None):
     return response
 
 
-def splitCesr(s, char):
+def split_cesr(s, char):
     # Find the last occurrence of the character
     index = s.rfind(char)
 

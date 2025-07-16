@@ -9,53 +9,53 @@ To enable the feature for Docker Desktop:
 	Select Apply and Restart."
 endef
 
-build-webs: .warn
+build-dws-base: .warn
 	@docker build \
 		--platform=linux/amd64,linux/arm64 \
-		-f images/webs.dockerfile \
+		-f images/dws-base.dockerfile \
 		-t gleif/webs:$(VERSION) .
 
-publish-webs:
-	@docker push gleif/webs:$(VERSION)
+publish-dws-base:
+	@docker push gleif/dws-base:$(VERSION)
 
-tag-webs-latest:
-	@$(MAKE) tag IMAGE_NAME=gleif/webs VERSION=$(VERSION)
+tag-dws-base-latest:
+	@$(MAKE) tag IMAGE_NAME=gleif/dws-base VERSION=$(VERSION)
 
-tag-latest: tag-webs-latest tag-did-webs-service-latest tag-did-webs-resolver-service-latest
+tag-latest: tag-dws-base-latest tag-dws-web-service-latest tag-dws-resolver-latest
 
-build-did-webs-service: .warn
+build-dws-web-service: .warn
 	@docker build \
 		--platform=linux/amd64,linux/arm64 \
-		-f images/did-webs-service.dockerfile \
+		-f images/dws-webs-service.dockerfile \
 		-t gleif/did-webs-service:latest \
 		-t gleif/did-webs-service:$(VERSION) .
 
-publish-did-webs-service:
-	@docker push gleif/did-webs-service:$(VERSION)
+publish-dws-web-service:
+	@docker push gleif/dws-web-service:$(VERSION)
 
-tag-did-webs-service-latest:
-	@$(MAKE) tag IMAGE_NAME=gleif/did-webs-service VERSION=$(VERSION)
+tag-dws-web-service-latest:
+	@$(MAKE) tag IMAGE_NAME=gleif/dws-web-service VERSION=$(VERSION)
 
-build-did-webs-resolver-service: .warn
+build-did-webs-resolver: .warn
 	@docker build \
 		--platform=linux/amd64,linux/arm64 \
-		-f images/did-webs-resolver-service.dockerfile \
-		-t gleif/did-webs-resolver-service:latest \
-		-t gleif/did-webs-resolver-service:$(VERSION) .
+		-f images/did-webs-resolver.dockerfile \
+		-t gleif/did-webs-resolver:latest \
+		-t gleif/did-webs-resolver:$(VERSION) .
 
-publish-did-webs-resolver-service:
-	@docker push gleif/did-webs-resolver-service:$(VERSION)
+publish-did-webs-resolver:
+	@docker push gleif/did-webs-resolver:$(VERSION)
 
-tag-did-webs-resolver-service-latest:
-	@$(MAKE) tag IMAGE_NAME=gleif/did-webs-resolver-service VERSION=$(VERSION)
+tag-did-webs-resolver-latest:
+	@$(MAKE) tag IMAGE_NAME=gleif/did-webs-resolver VERSION=$(VERSION)
 
 run-agent:
 	@docker run -p 5921:5921 -p 5923:5923 --name agent gleif/did-webs-resolver:$(VERSION)
 
 publish-latest:
-	@docker push gleif/webs:latest
-	@docker push gleif/did-webs-service:latest
-	@docker push gleif/did-webs-resolver-service:latest
+	@docker push gleif/dws-base:latest
+	@docker push gleif/dws-web-service:latest
+	@docker push gleif/did-webs-resolver:latest
 
 .warn:
 	@echo -e ${RED}"$$DOCKER_WARNING"${NO_COLOUR}

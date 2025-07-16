@@ -5,16 +5,17 @@ dkr.app.cli.commands module
 """
 
 import argparse
+import logging
 
 import falcon
 import hio
 import hio.core.tcp
 import viking
 from hio.core import http
-from keri.app import configing, habbing, notifying, oobiing
+from keri.app import configing, habbing, oobiing
 from keri.app.cli.common import existing
-from keri.vdr import viring
 
+from dkr import log_name, ogler
 from dkr.core import webbing
 
 parser = argparse.ArgumentParser(description='Launch web server capable of serving KERI AIDs as did:webs and did:web DIDs')
@@ -28,52 +29,68 @@ parser.add_argument(
 parser.add_argument(
     '--passcode', help='22 character encryption passcode for keystore (is not saved)', dest='bran', default=None
 )  # passcode => bran
-parser.add_argument('--config-dir', '-c', dest='configDir', help='directory override for configuration data', default=None)
-parser.add_argument('--config-file', dest='configFile', action='store', default='dkr', help='configuration filename override')
+parser.add_argument('--config-dir', '-c', dest='config_dir', help='directory override for configuration data', default=None)
+parser.add_argument('--config-file', dest='config_file', action='store', default='dkr', help='configuration filename override')
 parser.add_argument('--keypath', action='store', required=False, default=None)
 parser.add_argument('--certpath', action='store', required=False, default=None)
 parser.add_argument('--cafilepath', action='store', required=False, default=None)
+parser.add_argument(
+    '--loglevel',
+    action='store',
+    required=False,
+    default='CRITICAL',
+    help='Set log level to DEBUG | INFO | WARNING | ERROR | CRITICAL. Default is CRITICAL',
+)
+
+logger = ogler.getLogger(log_name)
 
 
 def launch(args):
+    ogler.level = logging.getLevelName(args.loglevel.upper())
+    logger.setLevel(ogler.level)
     name = args.name
     alias = args.alias
     base = args.base
     bran = args.bran
-    httpPort = args.http
+    http_port = args.http
     keypath = args.keypath
     certpath = args.certpath
     cafilepath = args.cafilepath
 
-    configFile = args.configFile
-    configDir = args.configDir
+    try:
+        http_port = int(http_port)
+    except ValueError:
+        logger.error(f'Invalid port number: {http_port}. Must be an integer.')
+        return []
 
-    cf = configing.Configer(name=configFile, base=base, headDirPath=configDir, temp=False, reopen=True, clear=False)
+    config_file = args.config_file
+    config_dir = args.config_dir
+
+    cf = configing.Configer(name=config_file, base=base, headDirPath=config_dir, temp=False, reopen=True, clear=False)
     hby = existing.setupHby(name=name, base=base, bran=bran, cf=cf)
-    hbyDoer = habbing.HaberyDoer(habery=hby)  # setup doer
-    obl = oobiing.Oobiery(hby=hby)
+    hby_doer = habbing.HaberyDoer(habery=hby)  # setup doer
+    oobiery = oobiing.Oobiery(hby=hby)
 
     app = falcon.App(
         middleware=falcon.CORSMiddleware(
             allow_origins='*', allow_credentials='*', expose_headers=['cesr-attachment', 'cesr-date', 'content-type']
         )
     )
+    webbing.setup(app, hby=hby)
+    voodoers = viking.setup(hby=hby, alias=alias)
 
     if keypath is not None:
         servant = hio.core.tcp.ServerTls(
-            certify=False, keypath=keypath, certpath=certpath, cafilepath=cafilepath, port=httpPort
+            certify=False, keypath=keypath, certpath=certpath, cafilepath=cafilepath, port=http_port
         )
     else:
         servant = None
 
-    server = http.Server(port=httpPort, app=app, servant=servant)
-    httpServerDoer = http.ServerDoer(server=server)
+    server = http.Server(port=http_port, app=app, servant=servant)
+    http_server_doer = http.ServerDoer(server=server)
 
-    webbing.setup(app, hby=hby)
-
-    voodoers = viking.setup(hby=hby, alias=alias)
-    doers = obl.doers + [hbyDoer, httpServerDoer]
+    doers = oobiery.doers + [hby_doer, http_server_doer]
     doers.extend(voodoers)
 
-    print(f'Launched web server capable of serving KERI AIDs as did:webs DIDs on: {httpPort}')
+    logger.info(f'Launched did:webs artifact webserver: {http_port}')
     return doers

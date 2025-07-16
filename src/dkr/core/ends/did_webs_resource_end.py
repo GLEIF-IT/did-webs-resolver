@@ -9,6 +9,10 @@ DID_JSON = 'did.json'
 
 
 class DIDWebsResourceEnd:
+    """
+    did.json HTTP resource for accessing did:webs DID documents for KERI AIDs.
+    """
+
     def __init__(self, hby):
         """
         Parameters:
@@ -35,7 +39,7 @@ class DIDWebsResourceEnd:
 
         # 404 if AID not recognized
         if aid not in self.hby.kevers:
-            raise falcon.HTTPNotFound(description='KERI AID {aid} not found')
+            raise falcon.HTTPNotFound(description=f'KERI AID {aid} not found')
 
         path = os.path.normpath(req.path).replace(f'/{DID_JSON}', '').replace('/', ':')
         port = ''
@@ -45,8 +49,8 @@ class DIDWebsResourceEnd:
         did = f'did:web:{req.host}{port}{path}'
 
         # Generate the DID Doc and return
-        result = didding.generateDIDDoc(self.hby, did, aid)
+        diddoc = didding.generate_did_doc(self.hby, did, aid)
 
         rep.status = falcon.HTTP_200
         rep.content_type = 'application/json'
-        rep.data = json.dumps(result, indent=2).encode('utf-8')
+        rep.data = json.dumps(diddoc, indent=2).encode('utf-8')

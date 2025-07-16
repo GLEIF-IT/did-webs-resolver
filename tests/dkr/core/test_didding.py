@@ -26,14 +26,14 @@ did = 'did:webs:127.0.0.1:ECCoHcHP1jTAW8Dr44rI2kWzfF71_U0sZwvV-J_q4YE7'
 def test_parse_keri_did():
     # Valid did:keri DID
     did = 'did:keri:EKW4IEkAZ8VQ_ADXbtRsSOQ_Gk0cRxp6U4qKSr4Eb8zg'
-    aid = didding.parseDIDKeri(did)
+    aid = didding.parse_did_keri(did)
     assert aid == 'EKW4IEkAZ8VQ_ADXbtRsSOQ_Gk0cRxp6U4qKSr4Eb8zg'
 
     # Invalid AID in did:keri
     did = 'did:keri:Gk0cRxp6U4qKSr4Eb8zg'
 
     with pytest.raises(ValueError) as e:
-        _, _ = didding.parseDIDKeri(did)
+        _, _ = didding.parse_did_keri(did)
 
     assert isinstance(e.value, ValueError)
     assert str(e.value) == 'Gk0cRxp6U4qKSr4Eb8zg is an invalid AID'
@@ -48,7 +48,7 @@ def test_parse_keri_did():
 
     for did in non_matching_dids:
         with pytest.raises(ValueError):
-            didding.parseDIDKeri(did)
+            didding.parse_did_keri(did)
 
         assert isinstance(e.value, ValueError)
 
@@ -56,13 +56,13 @@ def test_parse_keri_did():
 def test_parse_webs_did():
     with pytest.raises(ValueError) as e:
         did = 'did:webs:127.0.0.1:1234567'
-        domain, port, path, aid = didding.parseDIDWebs(did)
+        domain, port, path, aid = didding.parse_did_webs(did)
 
     assert isinstance(e.value, ValueError)
     assert str(e.value) == '1234567 is an invalid AID'
 
     did = 'did:webs:127.0.0.1:BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
-    domain, port, path, aid = didding.parseDIDWebs(did)
+    domain, port, path, aid = didding.parse_did_webs(did)
     assert '127.0.0.1' == domain
     assert None == port
     assert None == path
@@ -70,14 +70,14 @@ def test_parse_webs_did():
 
     # port url should be url encoded with %3a according to the spec
     did_port_bad = 'did:webs:127.0.0.1:7676:BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
-    domain, port, path, aid = didding.parseDIDWebs(did_port_bad)
+    domain, port, path, aid = didding.parse_did_webs(did_port_bad)
     assert '127.0.0.1' == domain
     assert None == port
     assert '7676' == path
     assert aid == 'BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
 
     did_port = 'did:webs:127.0.0.1%3a7676:BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
-    domain, port, path, aid = didding.parseDIDWebs(did_port)
+    domain, port, path, aid = didding.parse_did_webs(did_port)
     assert '127.0.0.1' == domain
     assert '7676' == port
     assert None == path
@@ -85,7 +85,7 @@ def test_parse_webs_did():
 
     # port should be url encoded with %3a according to the spec
     did_port_path_bad = 'did:webs:127.0.0.1:7676:my:path:BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
-    domain, port, path, aid = didding.parseDIDWebs(did_port_path_bad)
+    domain, port, path, aid = didding.parse_did_webs(did_port_path_bad)
     assert '127.0.0.1' == domain
     assert None == port
     assert '7676:my:path' == path
@@ -93,14 +93,14 @@ def test_parse_webs_did():
 
     # port is properly url encoded with %3a according to the spec
     did_port_path = 'did:webs:127.0.0.1%3a7676:my:path:BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
-    domain, port, path, aid = didding.parseDIDWebs(did_port_path)
+    domain, port, path, aid = didding.parse_did_webs(did_port_path)
     assert '127.0.0.1' == domain
     assert '7676' == port
     assert 'my:path' == path
     assert aid == 'BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
 
     did_path = 'did:webs:127.0.0.1:my:path:BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
-    domain, port, path, aid = didding.parseDIDWebs(did_path)
+    domain, port, path, aid = didding.parse_did_webs(did_path)
     assert '127.0.0.1' == domain
     assert None == port
     assert 'my:path' == path
@@ -110,12 +110,12 @@ def test_parse_webs_did():
 def test_parse_web_did():
     with pytest.raises(ValueError) as e:
         did = 'did:web:127.0.0.1:1234567'
-        domain, port, path, aid = didding.parseDIDWebs(did)
+        domain, port, path, aid = didding.parse_did_webs(did)
 
     assert isinstance(e.value, ValueError)
 
     did = 'did:web:127.0.0.1:BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
-    domain, port, path, aid = didding.parseDIDWebs(did)
+    domain, port, path, aid = didding.parse_did_webs(did)
     assert '127.0.0.1' == domain
     assert None == port
     assert None == path
@@ -123,14 +123,14 @@ def test_parse_web_did():
 
     # port url should be url encoded with %3a according to the spec
     did_port_bad = 'did:web:127.0.0.1:7676:BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
-    domain, port, path, aid = didding.parseDIDWebs(did_port_bad)
+    domain, port, path, aid = didding.parse_did_webs(did_port_bad)
     assert '127.0.0.1' == domain
     assert None == port
     assert '7676' == path
     assert aid == 'BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
 
     did_port = 'did:web:127.0.0.1%3a7676:BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
-    domain, port, path, aid = didding.parseDIDWebs(did_port)
+    domain, port, path, aid = didding.parse_did_webs(did_port)
     assert '127.0.0.1' == domain
     assert '7676' == port
     assert None == path
@@ -138,7 +138,7 @@ def test_parse_web_did():
 
     # port should be url encoded with %3a according to the spec
     did_port_path_bad = 'did:web:127.0.0.1:7676:my:path:BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
-    domain, port, path, aid = didding.parseDIDWebs(did_port_path_bad)
+    domain, port, path, aid = didding.parse_did_webs(did_port_path_bad)
     assert '127.0.0.1' == domain
     assert None == port
     assert '7676:my:path' == path
@@ -146,14 +146,14 @@ def test_parse_web_did():
 
     # port is properly url encoded with %3a according to the spec
     did_port_path = 'did:web:127.0.0.1%3a7676:my:path:BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
-    domain, port, path, aid = didding.parseDIDWebs(did_port_path)
+    domain, port, path, aid = didding.parse_did_webs(did_port_path)
     assert '127.0.0.1' == domain
     assert '7676' == port
     assert 'my:path' == path
     assert aid == 'BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
 
     did_path = 'did:web:127.0.0.1:my:path:BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'
-    domain, port, path, aid = didding.parseDIDWebs(did_path)
+    domain, port, path, aid = didding.parse_did_webs(did_path)
     assert '127.0.0.1' == domain
     assert None == port
     assert 'my:path' == path
@@ -166,7 +166,7 @@ def test_generate_did_doc_bad_ends_with():
     aid = 'EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HD'
 
     with pytest.raises(ValueError) as e:
-        didding.generateDIDDoc(hby=hby, aid=aid, did=did)
+        didding.generate_did_doc(hby=hby, aid=aid, did=did)
 
     assert isinstance(e.value, ValueError)
     assert str(e.value) == (
@@ -193,7 +193,7 @@ def test_generate_did_doc_unknown_aid():
     hby.kevers = {'a different aid': kever}
 
     with pytest.raises(ValueError) as e:
-        didding.generateDIDDoc(hby=hby, aid=aid, did=did)
+        didding.generate_did_doc(hby=hby, aid=aid, did=did)
 
     assert isinstance(e.value, ValueError)
     assert str(e.value) == 'unknown EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4'
@@ -201,6 +201,7 @@ def test_generate_did_doc_unknown_aid():
 
 def test_generate_did_doc_single_sig():
     hby = mock()
+    hby.name = 'test_hby'
     hab = mock()
     hab_db = mock()
     kever = mock()
@@ -279,7 +280,7 @@ def test_generate_did_doc_single_sig():
     rgy.reger.schms = schms
     vry = mock()
 
-    when(credentialing).Regery(hby=hby, name='test_hab').thenReturn(rgy)
+    when(credentialing).Regery(hby=hby, name=hby.name).thenReturn(rgy)
     when(verifying).Verifier(hby=hby, reger=rgy.reger).thenReturn(vry)
 
     when(rgy.reger.issus).get(keys=aid).thenReturn([])
@@ -287,7 +288,7 @@ def test_generate_did_doc_single_sig():
 
     when(rgy.reger).cloneCreds([], hab_db).thenReturn([])
 
-    diddoc = didding.generateDIDDoc(hby=hby, aid=aid, did=did)
+    diddoc = didding.generate_did_doc(hby=hby, aid=aid, did=did)
 
     assert diddoc == {
         'id': 'did:web:127.0.0.1%3A7676:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4',
@@ -324,6 +325,7 @@ def test_generate_did_doc_single_sig():
 
 def test_generate_did_doc_single_sig_with_designated_alias(mock_helping_now_utc):
     hby = mock()
+    hby.name = 'test_hby'
     hab = mock()
     hab_db = mock()
     kever = mock()
@@ -397,7 +399,7 @@ def test_generate_did_doc_single_sig_with_designated_alias(mock_helping_now_utc)
     rgy.reger.schms = schms
     vry = mock()
 
-    when(credentialing).Regery(hby=hby, name='test_hab').thenReturn(rgy)
+    when(credentialing).Regery(hby=hby, name=hby.name).thenReturn(rgy)
     when(verifying).Verifier(hby=hby, reger=rgy.reger).thenReturn(vry)
 
     cred1 = mock({'qb64': 'cred_1_qb64'}, coring.Saider)
@@ -412,7 +414,7 @@ def test_generate_did_doc_single_sig_with_designated_alias(mock_helping_now_utc)
     }
     when(rgy.reger).cloneCreds([cred1, cred2], hab_db).thenReturn([cloned_cred1, cloned_cred2])
 
-    diddoc = didding.generateDIDDoc(hby=hby, aid=aid, did=did)
+    diddoc = didding.generate_did_doc(hby=hby, aid=aid, did=did)
     assert diddoc == {
         'id': 'did:web:127.0.0.1%3A7676:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4',
         'verificationMethod': [
@@ -482,7 +484,7 @@ def test_generate_did_doc_single_sig_with_designated_alias(mock_helping_now_utc)
             ]
         )
     )
-    when(credentialing).Regery(hby=hby, name='test_hab').thenReturn(rgy)
+    when(credentialing).Regery(hby=hby, name=hby.name).thenReturn(rgy)
     when(verifying).Verifier(hby=hby, reger=rgy.reger).thenReturn(vry)
 
     cred1 = mock({'qb64': 'cred_1_qb64'}, coring.Saider)
@@ -497,7 +499,7 @@ def test_generate_did_doc_single_sig_with_designated_alias(mock_helping_now_utc)
     }
     when(rgy.reger).cloneCreds([cred1, cred2], hab_db).thenReturn([cloned_cred1, cloned_cred2])
 
-    diddoc = didding.generateDIDDoc(hby=hby, aid=aid, did=did, meta=True)
+    diddoc = didding.generate_did_doc(hby=hby, aid=aid, did=did, meta=True)
     assert diddoc == {
         'didDocument': {
             'id': 'did:web:127.0.0.1%3A7676:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4',
@@ -535,6 +537,7 @@ def test_generate_did_doc_single_sig_with_designated_alias(mock_helping_now_utc)
 
 def test_generate_did_doc_single_sig_meta(mock_helping_now_utc):
     hby = mock()
+    hby.name = 'test_hby'
     hab = mock()
     hab_db = mock()
     kever = mock()
@@ -611,7 +614,7 @@ def test_generate_did_doc_single_sig_meta(mock_helping_now_utc):
     rgy.reger.schms = schms
     vry = mock()
 
-    when(credentialing).Regery(hby=hby, name='test_hab').thenReturn(rgy)
+    when(credentialing).Regery(hby=hby, name=hby.name).thenReturn(rgy)
     when(verifying).Verifier(hby=hby, reger=rgy.reger).thenReturn(vry)
 
     when(rgy.reger.issus).get(keys=aid).thenReturn([])
@@ -619,7 +622,7 @@ def test_generate_did_doc_single_sig_meta(mock_helping_now_utc):
 
     when(rgy.reger).cloneCreds([], hab_db).thenReturn([])
 
-    diddoc = didding.generateDIDDoc(hby=hby, aid=aid, did=did, meta=True)
+    diddoc = didding.generate_did_doc(hby=hby, aid=aid, did=did, meta=True)
 
     assert diddoc == {
         'didDocument': {
@@ -667,6 +670,7 @@ def test_generate_did_doc_single_sig_meta(mock_helping_now_utc):
 
 def test_generate_did_doc_multi_sig():
     hby = mock()
+    hby.name = 'test_hby'
     hab = mock()
     hab_db = mock()
     kever = mock()
@@ -743,7 +747,7 @@ def test_generate_did_doc_multi_sig():
     rgy.reger.schms = schms
     vry = mock()
 
-    when(credentialing).Regery(hby=hby, name='test_hab').thenReturn(rgy)
+    when(credentialing).Regery(hby=hby, name=hby.name).thenReturn(rgy)
     when(verifying).Verifier(hby=hby, reger=rgy.reger).thenReturn(vry)
 
     when(rgy.reger.issus).get(keys=aid).thenReturn([])
@@ -751,7 +755,7 @@ def test_generate_did_doc_multi_sig():
 
     when(rgy.reger).cloneCreds([], hab_db).thenReturn([])
 
-    diddoc = didding.generateDIDDoc(hby=hby, aid=aid, did=did)
+    diddoc = didding.generate_did_doc(hby=hby, aid=aid, did=did)
 
     assert diddoc == {
         'id': 'did:web:127.0.0.1%3A7676:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4',
@@ -844,7 +848,7 @@ def test_generate_did_doc_multi_sig():
             ]
         )
     )
-    when(credentialing).Regery(hby=hby, name='test_hab').thenReturn(rgy)
+    when(credentialing).Regery(hby=hby, name=hby.name).thenReturn(rgy)
     when(verifying).Verifier(hby=hby, reger=rgy.reger).thenReturn(vry)
 
     when(rgy.reger.issus).get(keys=aid).thenReturn([])
@@ -852,7 +856,7 @@ def test_generate_did_doc_multi_sig():
 
     when(rgy.reger).cloneCreds([], hab_db).thenReturn([])
 
-    diddoc = didding.generateDIDDoc(hby=hby, aid=aid, did=did)
+    diddoc = didding.generate_did_doc(hby=hby, aid=aid, did=did)
 
     assert diddoc == {
         'id': 'did:web:127.0.0.1%3A7676:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4',
@@ -925,7 +929,7 @@ def test_generate_did_doc_single_sig_with_oobi():
 
     when(hby.db.roobi).get(keys=('with_oobi',)).thenReturn(None)
 
-    diddoc = didding.generateDIDDoc(hby=hby, aid=aid, did=did, oobi='with_oobi')
+    diddoc = didding.generate_did_doc(hby=hby, aid=aid, did=did, oobi='with_oobi')
 
     assert (
         diddoc
@@ -936,7 +940,7 @@ def test_generate_did_doc_single_sig_with_oobi():
     obr = basing.OobiRecord(state=oobiing.Result.failed)
     when(hby.db.roobi).get(keys=('with_oobi_2',)).thenReturn(obr)
 
-    diddoc = didding.generateDIDDoc(hby=hby, aid=aid, did=did, oobi='with_oobi_2')
+    diddoc = didding.generate_did_doc(hby=hby, aid=aid, did=did, oobi='with_oobi_2')
 
     assert (
         diddoc
@@ -949,9 +953,9 @@ def test_generate_did_doc_single_sig_with_oobi():
 def test_to_did_web():
     diddoc = {'id': 'did:webs:example:123', 'verificationMethod': [{'controller': 'did:webs:example:123'}]}
 
-    from dkr.core.didding import toDidWeb
+    from dkr.core.didding import to_did_web
 
-    result = toDidWeb(diddoc)
+    result = to_did_web(diddoc)
 
     assert result['id'] == 'did:web:example:123'
     assert result['verificationMethod'][0]['controller'] == 'did:web:example:123'
@@ -962,9 +966,9 @@ def test_to_did_web():
 def test_from_did_web():
     diddoc = {'id': 'did:web:example:123', 'verificationMethod': [{'controller': 'did:web:example:123'}]}
 
-    from dkr.core.didding import fromDidWeb
+    from dkr.core.didding import from_did_web
 
-    result = fromDidWeb(diddoc)
+    result = from_did_web(diddoc)
 
     # Verify the changes
     assert result['id'] == 'did:webs:example:123'
@@ -976,9 +980,9 @@ def test_from_did_web():
 def test_from_did_web_no_change():
     diddoc = {'id': 'did:webs:example:123', 'verificationMethod': [{'controller': 'did:webs:example:123'}]}
 
-    from dkr.core.didding import fromDidWeb
+    from dkr.core.didding import from_did_web
 
-    result = fromDidWeb(diddoc)
+    result = from_did_web(diddoc)
 
     assert result['id'] == 'did:webs:example:123'
     assert result['verificationMethod'][0]['controller'] == 'did:webs:example:123'

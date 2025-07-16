@@ -118,7 +118,7 @@ venv.bak/
 .ropeproject
 
 # mkdocs documentation
-/site
+site/
 
 # mypy
 .mypy_cache/
@@ -132,12 +132,8 @@ dmypy.json
 .idea/
 
 # Ignore runtime files
-/volume/dkr/examples/E*
-/volume/dkr/pages/E*
-# But allow the specific directory "ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe" for pytest
-!/volume/dkr/examples/ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe/
-!/volume/dkr/pages/ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe/
+docker/artifacts/E*
+docker/scripts/designated_aliases.json
+# But allow the specific directory "EEMVke69ZjQAXoK3FTLtCwpyWOXx5qkhzIDqXAgYfPgh" for pytest
+!docker/artifacts/EEMVke69ZjQAXoK3FTLtCwpyWOXx5qkhzIDqXAgYfPgh/
 .DS_Store
-coverage.xml
-.coverage
-*.cesr

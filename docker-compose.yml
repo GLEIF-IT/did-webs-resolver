@@ -1,72 +1,146 @@
-# networks:
-#     websnet:
+x-healthcheck: &healthcheck
+  interval: 3s
+  timeout: 3s
+  retries: 5
+  start_period: 2s
+x-python-envs: &python-envs
+  PYTHONUNBUFFERED: 1 # Ensure output is logged in real-time
+  PYTHONIOENCODING: UTF-8 # Ensure consistent logging encoding
+  PYTHONWARNINGS: ignore::SyntaxWarning # Ignore regular expression syntax warning
+
+volumes:
+    controller_keystore:
 
 services:
-    witnesshost:
-        container_name: witnesshost
-        hostname: witnesshost
-#        image: weboftrust/keri:1.1.21
+    # Witnesses used for the AID controller
+    witnesses:
+        image: gleif/keri:1.2.8
+        container_name: witnesses
+        hostname: witnesses
         platform: linux/amd64
-        tty: true
         volumes:
-            - ./volume/witnesshost/keripy/scripts/keri/cf/main/:/keripy/scripts/keri/cf/main/
+            - ./docker/config/witnesses/keri/cf/main/:/keripy/scripts/keri/cf/main/
+        healthcheck:
+            # healthcheck needs to be different in 1.2.6+ because it uses the Alpine base image and curl is not present
+            test: [ "CMD", "wget", "--spider", "--tries=1", "--no-verbose", "http://127.0.0.1:5642/oobi" ]
+            <<: *healthcheck
+        stop_grace_period: 1s
+        environment:
+            <<: *python-envs
         ports:
-            - 5642:5642  # witness
-            - 5643:5643  # witness
-            - 5644:5644  # witness
-        entrypoint: kli witness demo
-        # networks:
-        #     - websnet
+            - "5642:5642"  # witness Wan
+            - "5643:5643"  # witness Wil
+            - "5644:5644"  # witness Wes
+        entrypoint: kli witness demo --loglevel INFO
 
-    webs:
-        container_name: webs
-        hostname: webs
-        build:
-            context: .
-            dockerfile: ./images/webs.dockerfile
-        image: gleif/webs:latest
-        entrypoint: tail -f /dev/null
-        tty: true
-        volumes:
-            - ./volume/dkr/examples:/usr/local/var/webs/volume/dkr/examples
-            - ./volume/dkr/pages:/usr/local/var/webs/volume/dkr/pages
-        # networks:
-        #     - websnet
-
-    did-webs-service:
-        container_name: did-webs-service
-        hostname: did-webs-service
-        build:
-            context: .
-            dockerfile: ./images/did-webs-service.dockerfile
+    # Generates did.json and keri.cesr files
+    artifact-generator:
+        image: gleif/dws-base:latest
+        container_name: gen
+        hostname: gen
+        environment:
+            <<: *python-envs
         depends_on:
-            - webs
-        image: did-webs-service:latest
-        ports:
-            - 7676:7676
-        tty: true
-        volumes:
-            - ./volume/dkr/examples:/usr/local/var/webs/volume/dkr/examples
-            - ./volume/dkr/pages:/usr/local/var/webs/volume/dkr/pages
-        # networks:
-        #     - websnet
-        entrypoint: tail -f /dev/null
-        # entrypoint: dkr did webs service --name webserve --config-dir /usr/local/var/webs/volume/dkr/examples/my-scripts --config-file config-docker
-
-    did-webs-resolver:
-        container_name: did-webs-resolver
-        hostname: did-webs-resolver
+            witnesses:
+                condition: service_healthy
         build:
             context: .
-            dockerfile: ./images/did-webs-resolver-service.dockerfile
-        image: did-webs-resolver:latest
-        ports:
-            - 7677:7677
-        tty: true
+            dockerfile: images/dws-base.dockerfile
+        stop_grace_period: 1s
         volumes:
-            - ./volume/dkr/examples:/usr/local/var/webs/volume/dkr/examples
+            - ./docker/config/controller:/dws/config/controller
+            - ./docker/scripts:/dws/scripts
+            - ./docker/artifacts:/dws/web/dws
+            - ./docker/controller-init.sh:/dws/controller-init.sh
+            - controller_keystore:/usr/local/var/keri
+        entrypoint: /dws/controller-init.sh
+
+    dws-resolver:
+        image: gleif/did-webs-resolver:latest
+        container_name: dws-resolver
+        hostname: dws-resolver
+        environment:
+            <<: *python-envs
+        healthcheck:
+            test: [ "CMD", "curl", "-f", "http://127.0.0.1:7677/health" ]
+            <<: *healthcheck
         depends_on:
-            - webs
+            witnesses:
+                condition: service_healthy
+            artifact-generator:
+                condition: service_completed_successfully
+        build:
+            context: .
+            dockerfile: images/dws-resolver-service.dockerfile
+        stop_grace_period: 1s
+        ports:
+            - "7677:7677"
+        volumes:
+            - ./docker/config/controller:/dws/config/controller
+            - ./docker/scripts:/dws/scripts
+            - ./docker/artifacts:/dws/web/dws
+            - controller_keystore:/usr/local/var/keri
+        entrypoint: [
+            "dkr", "did", "webs", "resolver-service",
+                "--name", "my-keystore",
+                "--config-dir", "/dws/config/controller",
+                "--config-file", "my-keystore",
+                "--static-files-dir", "/dws/web",
+                "--loglevel", "INFO"
+        ]
+
+    dws-shell:
+        image: gleif/dws-base:latest # depends on dws-base built above
+        container_name: dws-shell
+        hostname: dws-shell
+        environment:
+            <<: *python-envs
+        depends_on:
+            witnesses:
+                condition: service_healthy
+            artifact-generator:
+                condition: service_completed_successfully
+            dws-resolver:
+                condition: service_healthy
+        stop_grace_period: 1s
+        volumes:
+            - ./docker/config/controller:/dws/config/controller
+            - ./docker/scripts:/dws/scripts
+            - ./docker/artifacts:/dws/web/dws
+            - ./docker/controller-init.sh:/dws/controller-init.sh
+            - controller_keystore:/usr/local/var/keri
         entrypoint: tail -f /dev/null
-        # networks:
-        #     - websnet
+        tty: true
+
+    # TODO enable the dws-web-service once the dws-webs-service is ready
+#    dws-web-service:
+#        image: gleif/did-webs-service:latest
+#        container_name: gleif/dws-web-service
+#        hostname: dws-web-service
+#        build:
+#            context: .
+#            dockerfile: ./images/dws-web-service.dockerfile
+#        stop_grace_period: 1s
+#        environment:
+#            <<: *python-envs
+#        depends_on:
+#            witnesses:
+#                condition: service_healthy
+#            artifact-generator:
+#                condition: service_completed_successfully
+#        healthcheck:
+#            test: [ "CMD", "curl", "-f", "http://127.0.0.1:7676/health" ]
+#            <<: *healthcheck
+#        ports:
+#            - "7676:7676"
+#        volumes:
+#            - ./docker/scripts:/dkr/scripts
+#            - ./docker/dws:/dkr/web/dws
+#            - controller_keystore:/usr/local/var/keri
+#        entrypoint: [
+#            "dkr", "did", "webs", "service",
+#            "--name", "my-keystore",
+#            "--config-dir", "/dws/config/controller",
+#            "--config-file", "my-keystore",
+#            "--loglevel", "INFO"
+#        ]
