@@ -10,10 +10,12 @@ import pytest
 from falcon import testing
 from hio.base import doing
 from keri import core, kering
-from keri.app import agenting, configing, delegating, forwarding, grouping, habbing, indirecting, oobiing
+from keri.app import agenting, configing, delegating, forwarding, grouping, habbing, indirecting, oobiing, \
+    notifying
 from keri.core import coring, eventing, scheming, serdering
 from keri.db import basing
 from keri.db.basing import dbdict
+from keri.peer import exchanging
 from keri.vdr import credentialing, verifying
 from mockito import mock, when
 
@@ -122,7 +124,10 @@ def test_resolver_with_witnesses():
         del_hby_doer = habbing.HaberyDoer(habery=del_hby)
         del_anchorer = delegating.Anchorer(hby=del_hby, proxy=None)
         del_postman = forwarding.Poster(hby=del_hby)
-        del_mbx = indirecting.MailboxDirector(hby=del_hby, topics=['/receipt', '/replay', '/reply'])
+        del_exc = exchanging.Exchanger(hby=del_hby, handlers=[])
+        del_notifier = notifying.Notifier(hby=del_hby)
+        delegating.loadHandlers(hby=del_hby, exc=del_exc, notifier=del_notifier)
+        del_mbx = indirecting.MailboxDirector(hby=del_hby, topics=['/receipt', '/replay', '/reply', '/delegate'], exc=del_exc)
         del_wit_rcptr_doer = agenting.WitnessReceiptor(hby=del_hby)
         del_receiptor = agenting.Receiptor(hby=del_hby)
         del_doers = [del_hby_doer, del_anchorer, del_postman, del_mbx, del_wit_rcptr_doer, del_receiptor]
@@ -132,7 +137,10 @@ def test_resolver_with_witnesses():
         dgt_hby_doer = habbing.HaberyDoer(habery=dgt_hby)
         dgt_anchorer = delegating.Anchorer(hby=dgt_hby, proxy=None)
         dgt_postman = forwarding.Poster(hby=dgt_hby)
-        dgt_mbx = indirecting.MailboxDirector(hby=dgt_hby, topics=['/receipt', '/replay', '/reply'])
+        dgt_exc = exchanging.Exchanger(hby=dgt_hby, handlers=[])
+        dgt_notifier = notifying.Notifier(hby=dgt_hby)
+        delegating.loadHandlers(hby=dgt_hby, exc=dgt_exc, notifier=dgt_notifier)
+        dgt_mbx = indirecting.MailboxDirector(hby=dgt_hby, topics=['/receipt', '/replay', '/reply', '/delegate'], exc=dgt_exc)
         dgt_wit_rcptr_doer = agenting.WitnessReceiptor(hby=dgt_hby)
         dgt_receiptor = agenting.Receiptor(hby=dgt_hby)
         dgt_doers = [dgt_hby_doer, dgt_anchorer, dgt_postman, dgt_mbx, dgt_wit_rcptr_doer, dgt_receiptor]
@@ -144,19 +152,29 @@ def test_resolver_with_witnesses():
         while not del_wit_rcptr_doer.cues:
             doist.recur(deeds=wit_deeds + del_deeds)
 
+        # Incept delegate proxy Hab
+        dgt_hab = dgt_hby.makeHab(name='proxy', isith='1', icount=1, toad=1, wits=[wan_pre])
+        dgt_wit_rcptr_doer.msgs.append(dict(pre=dgt_hab.pre))
+        while not dgt_wit_rcptr_doer.cues:
+            doist.recur(deeds=wit_deeds + dgt_deeds)
+
         # Get Delegator OOBI and resolve with Delegate
         del_oobi = HabHelpers.generate_oobi(hby=del_hby, alias='delegator', role=kering.Roles.witness)
         HabHelpers.resolve_wit_oobi(doist, wit_deeds, dgt_hby, del_oobi, alias='delegator')
 
+        proxy_oobi = HabHelpers.generate_oobi(hby=dgt_hby, alias='proxy', role=kering.Roles.witness)
+        HabHelpers.resolve_wit_oobi(doist, wit_deeds, del_hby, proxy_oobi, alias='proxy')
+
         # begin delegated inception- single sig
-        dgt_aid_hab = dgt_hby.makeHab(name='dgt_aid', delpre=del_hab.pre, isith='1', icount=1, toad=1, wits=[wan_pre])
-        dipper = keri_api.Dipper(hby=del_hby, hab=del_hab)
-        dipper_deed = doist.enter(doers=[dipper])
-        while not dipper_deed.done:
-            doist.recur(deeds=wit_deeds + del_deeds + dgt_deeds + dipper_deed)
+        dgt_hab = dgt_hby.makeHab(name='delegate', delpre=del_hab.pre, isith='1', icount=1, toad=1, wits=[wan_pre])
+        dipper = keri_api.Dipper(hby=dgt_hby, hab=dgt_hab, proxy='proxy')  # proxy is named "delegate" since that is what the openHab helper received
+        dip_sealer = keri_api.DipSealer(hby=del_hby, hab=del_hab, witRcptrDoer=del_wit_rcptr_doer)
+        delegation_deeds = doist.enter(doers=[dipper, dip_sealer])
+        while not dipper.done:
+            doist.recur(deeds=wit_deeds + del_deeds + dgt_deeds + delegation_deeds)
 
         # Waiting for witness receipts...
-        dgt_wit_rcptr_doer.msgs.append(dict(pre=dgt_aid_hab.pre))
+        dgt_wit_rcptr_doer.msgs.append(dict(pre=dgt_hab.pre))
         while not dgt_wit_rcptr_doer.cues:
             doist.recur(deeds=wit_deeds + dgt_deeds)
 
@@ -168,8 +186,6 @@ def test_resolver_with_witnesses():
         print("found delegable events")
         print(HabHelpers.has_delegables(del_hby.db))
 
-        # delegator approves and anchors delegation
-        # TODO complete anchoring - equivalent of kli delegate confirm command
 
         # delegate queries keystate from delegator to discover anchoring
         # TODO query keystate - equivalent of kli query command
@@ -178,7 +194,7 @@ def test_resolver_with_witnesses():
         # TODO resolve delegator OOBI - generate OOBI for the delegate and have delegator resolve it
 
         # now perform did:webs and did:keri resolution with an OOBI to test it.
-        aid = 'EEdpe-yqftH2_FO1-luoHvaiShK4y_E2dInrRQ2_2X5v'  # dgt_aid_hab.pre
+        aid = 'EEdpe-yqftH2_FO1-luoHvaiShK4y_E2dInrRQ2_2X5v'  # dgt_hab.pre
         host = '127.0.0.1'
         port = f'7677'
         did_path = 'dws'
@@ -197,7 +213,7 @@ def test_resolver_with_witnesses():
         CredentialHelpers.add_cred_to_aid(
             hby=dgt_hby,
             hby_doer=dgt_hby_doer,
-            hab=dgt_aid_hab,
+            hab=dgt_hab,
             regery=regery,
             schema_said='EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5',  # Designated Aliases Public Schema
             schema_json=schema_json,
@@ -211,9 +227,9 @@ def test_resolver_with_witnesses():
         # get keri.cesr
         reger = regery.reger
         keri_cesr = bytearray()
-        keri_cesr.extend(artifacting.gen_kel_cesr(dgt_aid_hab, aid))  # add KEL CESR stream
-        keri_cesr.extend(artifacting.gen_loc_schemes_cesr(dgt_aid_hab, aid))
-        keri_cesr.extend(artifacting.gen_des_aliases_cesr(dgt_aid_hab, reger, aid))
+        keri_cesr.extend(artifacting.gen_kel_cesr(dgt_hab, aid))  # add KEL CESR stream
+        keri_cesr.extend(artifacting.gen_loc_schemes_cesr(dgt_hab, aid))
+        keri_cesr.extend(artifacting.gen_des_aliases_cesr(dgt_hab, reger, aid))
 
         did_webs_diddoc = didding.generate_did_doc(dgt_hby, rgy=regery, did=did_webs_did, aid=aid, meta=meta)
         assert did_webs_diddoc[didding.DD_FIELD]['alsoKnownAs'] != [], 'alsoKnownAs field should contain designated aliases'
