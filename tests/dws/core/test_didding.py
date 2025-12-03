@@ -11,8 +11,8 @@ from unittest.mock import patch
 import pytest
 from hio.help.hicting import Mict
 from keri.app import habbing
-from keri.core import coring
-from keri.db import basing, subing
+from keri.core import coring, serdering
+from keri.db import basing, koming, subing
 from keri.vdr import credentialing, verifying
 from mockito import mock, unstub, when
 
@@ -229,6 +229,7 @@ def test_generate_did_doc_single_sig():
     aid = 'EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4'
     hab.name = 'test_hab'
     hab.db = hab_db
+    hab.delpre = None
     hby.habs = {aid: hab}
     sner = mock()
     sner.num = 0
@@ -353,6 +354,7 @@ def test_generate_did_doc_single_sig_with_designated_alias(mock_helping_now_utc)
     aid = 'EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4'
     hab.name = 'test_hab'
     hab.db = hab_db
+    hab.delpre = None
     hby.habs = {aid: hab}
     sner = mock()
     sner.num = 0
@@ -565,6 +567,7 @@ def test_generate_did_doc_single_sig_meta(mock_helping_now_utc):
     aid = 'EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4'
     hab.name = 'test_hab'
     hab.db = hab_db
+    hab.delpre = None
     hby.habs = {aid: hab}
     sner = mock()
     sner.num = 0
@@ -699,6 +702,7 @@ def test_generate_did_doc_multi_sig():
     did = 'did:web:127.0.0.1%3A7676:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4'
     aid = 'EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4'
     hab.name = 'test_hab'
+    hab.delpre = None
     hab.db = hab_db
     hby.habs = {aid: hab}
     sner = mock()
@@ -1117,5 +1121,36 @@ def test_designated_aliases_generation_returns_creds_when_non_local_aid():
     da = didding.gen_designated_aliases(hby, rgy, 'test_aid')
     assert da == [], 'Expected empty list for designated aliases when no credentials are found'
 
+
 def test_generate_did_doc_with_delegator_shows_service_delegator_section():
     pass
+
+
+def test_gen_delegation_service_generates_correctly():
+    seal_evt = dict(i='delegate_aid', s='0', d='delegate_aid')
+    mockSealSerder = mock(serdering.SerderKERI)
+    mockSealSerder.sad = {'a': [{'d': 'delegator_aid'}]}
+
+    hby = mock(habbing.Habery)
+    hby.db = mock(basing.Baser)
+    hby.db.roobi = mock(koming.Komer)
+    when(hby.db).fetchLastSealingEventByEventSeal(pre='delegator_aid', seal=seal_evt).thenReturn(mockSealSerder)
+    oobi = 'http://example.com/oobi/delegate_aid'
+    obr = basing.OobiRecord(cid='delegator_aid')
+    when(hby.db.roobi).getItemIter().thenReturn([((oobi,), obr)])
+
+    assert didding.gen_delegation_service(hby=hby, pre='delegate_aid', delpre='delegator_aid')
+
+
+def test_gen_delegation_service_no_oobi_returns_none():
+    seal_evt = dict(i='delegate_aid', s='0', d='delegate_aid')
+    mockSealSerder = mock(serdering.SerderKERI)
+    mockSealSerder.sad = {'a': [{'d': 'delegator_aid'}]}
+
+    hby = mock(habbing.Habery)
+    hby.db = mock(basing.Baser)
+    hby.db.roobi = mock(koming.Komer)
+    when(hby.db).fetchLastSealingEventByEventSeal(pre='delegator_aid', seal=seal_evt).thenReturn(mockSealSerder)
+    when(hby.db.roobi).getItemIter().thenReturn([])
+
+    assert didding.gen_delegation_service(hby=hby, pre='delegate_aid', delpre='delegator_aid') is None

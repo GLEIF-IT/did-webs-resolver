@@ -12,6 +12,7 @@ import urllib.parse
 from base64 import urlsafe_b64encode
 from functools import reduce
 
+from keri import kering
 from keri.app import habbing
 from keri.core import coring
 from keri.core.eventing import Kever
@@ -20,7 +21,7 @@ from keri.help import helping
 from keri.vdr import credentialing
 
 from dws import DidWebsError, UnknownAID, log_name, ogler
-from dws.core import habs
+from dws.core import habs, oobiing
 
 logger = ogler.getLogger(log_name)
 
@@ -430,7 +431,10 @@ def generate_did_doc(hby: habbing.Habery, rgy: credentialing.Regery, did, aid, m
         ends = habs.get_role_urls(baser=hby.db, kever=kever)
         serv_ends.extend(add_ends(ends))
 
-    # TODO: add delegation section if Hab is a delegated hab
+    if hasattr(hab, 'delpre') and hab.delpre is not None:
+        del_serv_end = gen_delegation_service(hby=hby, pre=hab.pre, delpre=hab.delpre)
+        if del_serv_end is not None:
+            serv_ends.append(del_serv_end)
 
     equiv_ids, aka_ids = get_equiv_aka_ids(did, aid, hby, rgy)
 
@@ -564,3 +568,14 @@ def add_ends(ends):
         return [v]
 
     return reduce(lambda emit, role: emit + process_role(role), ends, [])
+
+
+def gen_delegation_service(hby: habbing.Habery, pre: str, delpre: str):
+    seal = dict(i=pre, s='0', d=pre)
+    dserder = hby.db.fetchLastSealingEventByEventSeal(pre=delpre, seal=seal)
+    approval_evt_digest = dserder.sad['a'][0]['d']
+    del_oobi = oobiing.get_resolved_oobi(hby=hby, pre=delpre)
+    if del_oobi is None:
+        logger.error(f'No resolved OOBI found for delegate AID {delpre} for delegator AID {pre}')
+        return None
+    return dict(id=approval_evt_digest, type='DelegatorOOBI', serviceEndpoint=del_oobi)
