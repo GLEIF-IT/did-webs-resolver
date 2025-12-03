@@ -15,7 +15,7 @@ from functools import reduce
 from keri import kering
 from keri.app import habbing
 from keri.core import coring
-from keri.core.eventing import Kever
+from keri.core.eventing import Kever, Kevery
 from keri.db.basing import Baser
 from keri.help import helping
 from keri.vdr import credentialing
@@ -312,7 +312,7 @@ def generate_weighted_threshold_proof(thold, verfers, vms, did, aid):
     return generate_weighted_threshold_proof2022(aid, did, threshold, conditions)
 
 
-def gen_did_document(did, vms, service_endpoints, also_known_as):
+def gen_did_document(did, verification_methods, service_endpoints, also_known_as):
     """
     Generate a basic DID document structure.
 
@@ -324,14 +324,14 @@ def gen_did_document(did, vms, service_endpoints, also_known_as):
 
     Parameters:
         did (str): The DID to include in the document.
-        vms (list): A list of verification methods.
+        verification_methods (list): A list of verification methods.
         service_endpoints (list): A list of service endpoints.
         also_known_as (list): A list of alternative identifiers.
 
     Returns:
         dict: A basic DID document structure.
     """
-    return dict(id=did, verificationMethod=vms, service=service_endpoints, alsoKnownAs=also_known_as)
+    return dict(id=did, verificationMethod=verification_methods, service=service_endpoints, alsoKnownAs=also_known_as)
 
 
 def gen_did_resolution_result(did_doc, witness_list, seq_no, equivalent_ids):
@@ -418,27 +418,11 @@ def generate_did_doc(hby: habbing.Habery, rgy: credentialing.Regery, did, aid, m
     else:
         raise UnknownAID(aid, did)
 
-    vms = generate_verification_methods(kever.verfers, kever.tholder.thold, did, aid)
-
-    serv_ends = []
-    # TODO: move Location Scheme and Endpoint Role Authorization to dedicated function
-    if hab and hasattr(hab, 'fetchRoleUrls'):
-        ends = hab.fetchRoleUrls(cid=aid)
-        serv_ends.extend(add_ends(ends))
-        ends = hab.fetchWitnessUrls(cid=aid)
-        serv_ends.extend(add_ends(ends))
-    else:
-        ends = habs.get_role_urls(baser=hby.db, kever=kever)
-        serv_ends.extend(add_ends(ends))
-
-    if hasattr(hab, 'delpre') and hab.delpre is not None:
-        del_serv_end = gen_delegation_service(hby=hby, pre=hab.pre, delpre=hab.delpre)
-        if del_serv_end is not None:
-            serv_ends.append(del_serv_end)
-
+    verification_methods = generate_verification_methods(kever.verfers, kever.tholder.thold, did, aid)
+    service_endpoints = gen_service_endpoints(hby, hab, kever, aid)
     equiv_ids, aka_ids = get_equiv_aka_ids(did, aid, hby, rgy)
 
-    did_doc = gen_did_document(did, vms, serv_ends, aka_ids)
+    did_doc = gen_did_document(did, verification_methods, service_endpoints, aka_ids)
     if meta is True:
         return gen_did_resolution_result(
             did_doc=did_doc,
@@ -556,6 +540,25 @@ def gen_designated_aliases(hby: habbing.Habery, rgy: credentialing.Regery, aid: 
     return list(itertools.chain.from_iterable(da_ids))
 
 
+def gen_service_endpoints(hby: habbing.Habery, hab: habbing.Hab, kever: Kever, aid: str):
+    """Generate service endpoints including both witness and delegation service endpoints."""
+    serv_ends = []
+    # TODO: move Location Scheme and Endpoint Role Authorization to dedicated function
+    if hab and hasattr(hab, 'fetchRoleUrls'):
+        ends = hab.fetchRoleUrls(cid=aid)
+        serv_ends.extend(add_ends(ends))
+        ends = hab.fetchWitnessUrls(cid=aid)
+        serv_ends.extend(add_ends(ends))
+    else:
+        ends = habs.get_role_urls(baser=hby.db, kever=kever)
+        serv_ends.extend(add_ends(ends))
+
+    if hasattr(hab, 'delpre') and hab.delpre is not None:
+        del_serv_end = gen_delegation_service(hby=hby, pre=hab.pre, delpre=hab.delpre)
+        serv_ends.extend(del_serv_end)
+    return serv_ends
+
+
 def add_ends(ends):
     def process_role(role):
         return reduce(lambda rs, eids: rs + process_eids(eids, role), ends.getall(role), [])
@@ -571,11 +574,12 @@ def add_ends(ends):
 
 
 def gen_delegation_service(hby: habbing.Habery, pre: str, delpre: str):
+    """Returns an array of delegation service endpoints for the delegator AID."""
     seal = dict(i=pre, s='0', d=pre)
     dserder = hby.db.fetchLastSealingEventByEventSeal(pre=delpre, seal=seal)
     approval_evt_digest = dserder.sad['a'][0]['d']
     del_oobi = oobiing.get_resolved_oobi(hby=hby, pre=delpre)
     if del_oobi is None:
         logger.error(f'No resolved OOBI found for delegate AID {delpre} for delegator AID {pre}')
-        return None
-    return dict(id=approval_evt_digest, type='DelegatorOOBI', serviceEndpoint=del_oobi)
+        return []
+    return [dict(id=approval_evt_digest, type='DelegatorOOBI', serviceEndpoint=del_oobi)]
