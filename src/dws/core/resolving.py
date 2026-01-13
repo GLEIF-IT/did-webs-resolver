@@ -604,7 +604,10 @@ def resolve_did_keri(hby: habbing.Habery, rgy: credentialing.Regery, did: str, o
     obr = basing.OobiRecord(date=helping.nowIso8601())
     obr.cid = aid
     hby.db.oobis.pin(keys=(oobi,), val=obr)
-    while hby.db.roobi.get(keys=(oobi,)) is None:
+    while (
+        hby.db.roobi.get(keys=(oobi,)) is None or aid not in hby.kevers
+    ):  # wait for aid in hby.kevers waits for delegates to have their AES found
         doist.recur(deeds)
+        hby.kvy.processEscrows()  # for delegated AIDs so authorizing event seals (AES) from delegator ixn evts are found
 
     return True, didding.generate_did_doc(hby, rgy, did=did, aid=aid, meta=meta)

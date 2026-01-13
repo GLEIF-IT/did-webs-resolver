@@ -2,7 +2,7 @@
 	build-dynamic-service publish-dynamic-service tag-dynamic-service-latest \
 	build-did-webs-resolver-service publish-did-webs-resolver-service tag-did-webs-resolver-latest \
 	run-agent build-all publish-latest warn tag fmt check tag-latest-all
-VERSION=0.3.1  # also change in pyproject.toml and src/dws/__init__.py
+VERSION=0.3.2  # also change in pyproject.toml and src/dws/__init__.py
 
 RED="\033[0;31m"
 NO_COLOUR="\033[0m"
@@ -100,3 +100,8 @@ check:
 	uv tool run ruff check --select I
 	uv tool run ruff format --check
 
+build-pkg:
+	uv build
+
+publish-pkg:
+	uv publish

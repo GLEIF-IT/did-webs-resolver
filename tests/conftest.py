@@ -7,6 +7,7 @@ https://docs.pytest.org/en/latest/pythonpath.html
 """
 
 import json
+from collections import deque
 from contextlib import contextmanager
 from pathlib import Path
 from typing import List, Union
@@ -80,7 +81,7 @@ class CredentialHelpers:
         private: bool = False,
         private_credential_nonce: str = None,
         private_subject_nonce: str = None,
-        additional_deeds: List[doing.Doer] = None,
+        additional_deeds: deque = None,
     ):
         """Issues a credential with a given AID using the schema, subject data, rules, edges (source), and recipient (recp)."""
         additional_deeds = additional_deeds or decking.deque(

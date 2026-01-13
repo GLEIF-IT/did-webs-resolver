@@ -1,6 +1,6 @@
 # -*- encoding: utf-8 -*-
 """
-kara.app.commands module
+dws.app.cli.commands module
 
 """
 

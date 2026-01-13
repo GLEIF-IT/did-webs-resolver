@@ -82,8 +82,11 @@ class KeriResolver(doing.DoDoer):
         obr.cid = aid
         self.hby.db.oobis.pin(keys=(oobi,), val=obr)
 
-        while self.hby.db.roobi.get(keys=(oobi,)) is None:
+        while (
+            self.hby.db.roobi.get(keys=(oobi,)) is None or aid not in self.hby.kevers
+        ):  # wait for aid in hby.kevers waits for delegates to have their AES found
             now = helping.nowUTC()
+            self.hby.kvy.processEscrows()  # for delegated AIDs so authorizing event seals (AES) from delegator ixn evts are found
             if (now - start_time) > datetime.timedelta(seconds=self.TimeoutOOBIResolve):
                 raise kering.KeriError(f'OOBI resolution timed out after {self.TimeoutOOBIResolve} seconds for OOBI: {oobi}')
             _ = yield tock

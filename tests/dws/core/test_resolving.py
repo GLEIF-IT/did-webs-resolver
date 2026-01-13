@@ -3,6 +3,7 @@ import os
 import tempfile
 import threading
 import urllib.parse
+from collections import deque
 from unittest.mock import MagicMock, Mock, patch
 
 import falcon
@@ -10,10 +11,11 @@ import pytest
 from falcon import testing
 from hio.base import doing
 from keri import core, kering
-from keri.app import agenting, configing, delegating, forwarding, grouping, habbing, indirecting, oobiing
+from keri.app import agenting, configing, delegating, forwarding, grouping, habbing, indirecting, notifying, oobiing
 from keri.core import coring, eventing, scheming, serdering
 from keri.db import basing
 from keri.db.basing import dbdict
+from keri.peer import exchanging
 from keri.vdr import credentialing, verifying
 from mockito import mock, when
 
@@ -21,8 +23,9 @@ from dws import ArtifactResolveError, log_name, ogler, set_log_level
 from dws.core import artifacting, didding, generating, requesting, resolving
 from dws.core.didkeri import KeriResolver
 from dws.core.ends import monitoring
-from tests import conftest
+from tests import conftest, keri_api
 from tests.conftest import CredentialHelpers, HabbingHelpers, WitnessContext, self_attested_aliases_cred_subj
+from tests.keri_api import HabHelpers
 
 
 def test_health_end():
@@ -42,15 +45,20 @@ def test_resolver_with_witnesses():
     """
     This test spins up an actual witness and performs proper, receipted inception and credential
     issuance for an end-to-end integration test of the universal resolver endpoints.
+
+    It also includes the delegator for the AID controller to ensure the service section of the did document shows the delegator OOBI
     """
     # setting log level to DEBUG so that it triggers the debug logging branch in the RequestLoggerMiddleware
     logger = ogler.getLogger(log_name)
     set_log_level('DEBUG', logger)
 
-    aid_salt = b'0AAB_Fidf5WeZf6VFc53IxVw'
+    delegator_salt = b'0ABaQTNARS1U1u7VhP0mnEKz'
+    delegate_salt = b'0AAB_Fidf5WeZf6VFc53IxVw'
     resolver_salt = b'0AAl3nvsqKGyKHp2Hz9wLy9t'
     registry_nonce = '0ADV24br-aaezyRTB-oUsZJE'
     wit_salt = core.Salter(raw=b'abcdef0123456789').qb64
+
+    # Witness config
     wit_cf = configing.Configer(name='wan', temp=False, reopen=True, clear=False)
     wit_cf.put(
         json.loads("""{
@@ -61,24 +69,26 @@ def test_resolver_with_witnesses():
     )
     wan_oobi = 'http://127.0.0.1:6642/oobi/BPwwr5VkI1b7ZA2mVbzhLL47UPjsGBX4WeO6WRv6c7H-/controller?name=Wan&tag=witness'
 
-    # Config of the AID controller keystore who is having their did:webs or did:keri artifacts resolved
-    ckr_cf = configing.Configer(name='crackers', temp=False, reopen=True, clear=False)
-    ckr_cf.put(
-        json.loads("""{
-              "dt": "2022-01-20T12:57:59.823350+00:00",
-              "iurls": [
-                "http://127.0.0.1:6642/oobi/BPwwr5VkI1b7ZA2mVbzhLL47UPjsGBX4WeO6WRv6c7H-/controller?name=Wan&tag=witness"
-              ]}""")
-    )
+    aid_conf = f"""{{
+        "dt": "2022-01-20T12:57:59.823350+00:00",
+        "iurls": [\"{wan_oobi}\"]}}"""
+    # Config of the Delegator
+    delegator_cf = configing.Configer(name='delegator', temp=False, reopen=True, clear=False)
+    delegator_cf.put(json.loads(aid_conf))
 
-    # Open the witness Habery and Hab, feed it into the witness setup, and then create the AID controller Habery and Hab
+    # Config of the AID controller keystore who is having their did:webs or did:keri artifacts resolved
+    delegate_cf = configing.Configer(name='delegate', temp=False, reopen=True, clear=False)
+    delegate_cf.put(json.loads(aid_conf))
+
+    # Open the witness Habery and Hab, feed it into the witness setup, and then create the delegate and AID controller Haberies and Habs
     with (
         HabbingHelpers.openHab(salt=bytes(wit_salt, 'utf-8'), name='wan', transferable=False, temp=True, cf=wit_cf) as (
             wit_hby,
             wit_hab,
         ),
         WitnessContext.with_witness(name='wan', hby=wit_hby) as wan_wit,
-        habbing.openHab(salt=aid_salt, name='crackers', transferable=True, temp=True, cf=ckr_cf) as (ck_hby, ck_hab),
+        habbing.openHby(salt=delegate_salt, name='delegator', temp=True, cf=delegator_cf) as del_hby,
+        habbing.openHby(salt=delegate_salt, name='delegate', temp=True, cf=delegate_cf) as dgt_hby,
         habbing.openHab(salt=resolver_salt, name='resolver', transferable=True, temp=True, cf=None) as (
             resolver_hby,
             resolver_hab,
@@ -88,56 +98,117 @@ def test_resolver_with_witnesses():
         tock = 0.03125
         doist = doing.Doist(limit=0.0, tock=tock, real=True)
         # Doers and deeds for witness wan
-        wit_deeds = doist.enter(doers=wan_wit.doers)
+        wit_deeds: deque = doist.enter(doers=wan_wit.doers)
 
-        # Have Cracker Hab Resolve Wan's witness OOBI
-        oobiery = oobiing.Oobiery(hby=ck_hby)
-        authn = oobiing.Authenticator(hby=ck_hby)
+        # Introduce the witness to each of the delegator and delegate Haberies
+
+        # Have the Delegator Hab Resolve Wan's witness OOBI
+        del_oobiery = oobiing.Oobiery(hby=del_hby)
+        del_authn = oobiing.Authenticator(hby=del_hby)
+        del_oobiery_deeds = doist.enter(doers=del_oobiery.doers + del_authn.doers)
+        while not del_oobiery.hby.db.roobi.get(keys=(wan_oobi,)):
+            doist.recur(deeds=wit_deeds + del_oobiery_deeds)
+            del_hby.kvy.processEscrows()  # process any escrows from witness receipts
+
+        # Have Delegate Hab Resolve Wan's witness OOBI
+        oobiery = oobiing.Oobiery(hby=dgt_hby)
+        authn = oobiing.Authenticator(hby=dgt_hby)
         oobiery_deeds = doist.enter(doers=oobiery.doers + authn.doers)
         while not oobiery.hby.db.roobi.get(keys=(wan_oobi,)):
             doist.recur(deeds=wit_deeds + oobiery_deeds)
-            ck_hby.kvy.processEscrows()  # process any escrows from witness receipts
-        print(f'Resolved OOBI: {wan_oobi} to {oobiery.hby.db.roobi.get(keys=(wan_oobi,))}')
+            dgt_hby.kvy.processEscrows()  # process any escrows from witness receipts
 
-        # Doers and deeds for the cracker_1 Hab and Habery
-        ck_hby_doer = habbing.HaberyDoer(habery=ck_hby)
-        ck_anchorer = delegating.Anchorer(hby=ck_hby, proxy=None)
-        ck_postman = forwarding.Poster(hby=ck_hby)
-        ck_mbx = indirecting.MailboxDirector(hby=ck_hby, topics=['/receipt', '/replay', '/reply'])
-        ck_wit_rcptr_doer = agenting.WitnessReceiptor(hby=ck_hby)
-        ck_receiptor = agenting.Receiptor(hby=ck_hby)
-        ck_doers = [ck_hby_doer, ck_anchorer, ck_postman, ck_mbx, ck_wit_rcptr_doer, ck_receiptor]
-        ck1_deeds = doist.enter(doers=ck_doers)
+        # Set up the Doers (deeds) for the delegator and delegate
 
-        # perform inception
-        cracker_1_hab = ck_hby.makeHab(name='cracker_1', isith='1', icount=1, toad=1, wits=[wan_pre])
+        # Doers and deeds for the delegator's Hab and Habery
+        del_hby_doer = habbing.HaberyDoer(habery=del_hby)
+        del_anchorer = delegating.Anchorer(hby=del_hby, proxy=None)
+        del_postman = forwarding.Poster(hby=del_hby)
+        del_exc = exchanging.Exchanger(hby=del_hby, handlers=[])
+        del_notifier = notifying.Notifier(hby=del_hby)
+        delegating.loadHandlers(hby=del_hby, exc=del_exc, notifier=del_notifier)
+        del_mbx = indirecting.MailboxDirector(hby=del_hby, topics=['/receipt', '/replay', '/reply', '/delegate'], exc=del_exc)
+        del_wit_rcptr_doer = agenting.WitnessReceiptor(hby=del_hby)
+        del_receiptor = agenting.Receiptor(hby=del_hby)
+        del_doers = [del_hby_doer, del_anchorer, del_postman, del_mbx, del_wit_rcptr_doer, del_receiptor]
+        del_deeds: deque = doist.enter(doers=del_doers)
+
+        # Doers and deeds for the dgt_aid Hab and Habery
+        dgt_hby_doer = habbing.HaberyDoer(habery=dgt_hby)
+        dgt_anchorer = delegating.Anchorer(hby=dgt_hby, proxy=None)
+        dgt_postman = forwarding.Poster(hby=dgt_hby)
+        dgt_exc = exchanging.Exchanger(hby=dgt_hby, handlers=[])
+        dgt_notifier = notifying.Notifier(hby=dgt_hby)
+        delegating.loadHandlers(hby=dgt_hby, exc=dgt_exc, notifier=dgt_notifier)
+        dgt_mbx = indirecting.MailboxDirector(hby=dgt_hby, topics=['/receipt', '/replay', '/reply', '/delegate'], exc=dgt_exc)
+        dgt_wit_rcptr_doer = agenting.WitnessReceiptor(hby=dgt_hby)
+        dgt_receiptor = agenting.Receiptor(hby=dgt_hby)
+        dgt_doers = [dgt_hby_doer, dgt_anchorer, dgt_postman, dgt_mbx, dgt_wit_rcptr_doer, dgt_receiptor]
+        dgt_deeds: deque = doist.enter(doers=dgt_doers)
+
+        # Incept delegator Hab
+        del_hab = del_hby.makeHab(name='delegator', isith='1', icount=1, toad=1, wits=[wan_pre])
+        del_wit_rcptr_doer.msgs.append(dict(pre=del_hab.pre))
+        while not del_wit_rcptr_doer.cues:
+            doist.recur(deeds=wit_deeds + del_deeds)
+
+        # Incept delegate proxy Hab
+        pxy_hab = dgt_hby.makeHab(name='proxy', isith='1', icount=1, toad=1, wits=[wan_pre])
+        dgt_wit_rcptr_doer.msgs.append(dict(pre=pxy_hab.pre))
+        while not dgt_wit_rcptr_doer.cues:
+            doist.recur(deeds=wit_deeds + dgt_deeds)
+
+        # Get Delegator OOBI and resolve with Delegate
+        del_oobi = HabHelpers.generate_oobi(hby=del_hby, alias='delegator', role=kering.Roles.witness)
+        HabHelpers.resolve_wit_oobi(doist, wit_deeds, dgt_hby, del_oobi, alias='delegator')
+
+        proxy_oobi = HabHelpers.generate_oobi(hby=dgt_hby, alias='proxy', role=kering.Roles.witness)
+        HabHelpers.resolve_wit_oobi(doist, wit_deeds, del_hby, proxy_oobi, alias='proxy')
+
+        # begin delegated inception- single sig
+        dgt_hab = dgt_hby.makeHab(name='delegate', delpre=del_hab.pre, isith='1', icount=1, toad=1, wits=[wan_pre])
+        dipper = keri_api.Dipper(
+            hby=dgt_hby, hab=dgt_hab, proxy='proxy'
+        )  # proxy is named "delegate" since that is what the openHab helper received
+        dip_sealer = keri_api.DipSealer(hby=del_hby, hab=del_hab, witRcptrDoer=del_wit_rcptr_doer)
+        delegation_deeds: deque = doist.enter(doers=[dipper, dip_sealer])
+        while not dipper.done:
+            doist.recur(deeds=wit_deeds + del_deeds + dgt_deeds + delegation_deeds)
 
         # Waiting for witness receipts...
-        ck_wit_rcptr_doer.msgs.append(dict(pre=cracker_1_hab.pre))
-        while not ck_wit_rcptr_doer.cues:
-            doist.recur(deeds=wit_deeds + ck1_deeds)
+        dgt_wit_rcptr_doer.msgs.append(dict(pre=dgt_hab.pre))
+        while not dgt_wit_rcptr_doer.cues:
+            doist.recur(deeds=wit_deeds + dgt_deeds)
+
+        # Wait for delegation request to show up for delegator
+        while not HabHelpers.has_delegables(del_hby.db):
+            doist.recur(deeds=wit_deeds + del_deeds + dgt_deeds)
+            # del_hby.kvy.processEscrows()  # process any escrows from witness receipts
+            # dgt_hby.kvy.processEscrows()  # process any escrows from witness receipts
+        print('found delegable events')
+        print(HabHelpers.has_delegables(del_hby.db))
 
         # now perform did:webs and did:keri resolution with an OOBI to test it.
-        aid = 'EEdpe-yqftH2_FO1-luoHvaiShK4y_E2dInrRQ2_2X5v'  # cracker_1_hab.pre
+        aid = 'EHUi8qUknNeLBYtZ_tUwuLjlaRm-srp2PqVBO5YEJ4PA'  # dgt_hab.pre
         host = '127.0.0.1'
         port = f'7677'
         did_path = 'dws'
         meta = True
         # fmt: off
-        did_webs_did = f'did:webs:{host}%3A{port}:{did_path}:{aid}?meta=true'         # did:webs:127.0.0.1%3A7677:dws:EEdpe-yqftH2_FO1-luoHvaiShK4y_E2dInrRQ2_2X5v?meta=true
-        did_keri_did = f'did:keri:{aid}'                                              # did:keri:EEdpe-yqftH2_FO1-luoHvaiShK4y_E2dInrRQ2_2X5v
-        did_json_url = f'http://{host}:{port}/{did_path}/{aid}/did.json'    # http://127.0.0.1:7677/dws/EEdpe-yqftH2_FO1-luoHvaiShK4y_E2dInrRQ2_2X5v/did.json?meta=true
-        keri_cesr_url = f'http://{host}:{port}/{did_path}/{aid}/keri.cesr'            # http://127.0.0.1:7677/dws/EEdpe-yqftH2_FO1-luoHvaiShK4y_E2dInrRQ2_2X5v/keri.cesr
+        did_webs_did = f'did:webs:{host}%3A{port}:{did_path}:{aid}?meta=true'  # did:webs:127.0.0.1%3A7677:dws:'EHUi8qUknNeLBYtZ_tUwuLjlaRm-srp2PqVBO5YEJ4PA'?meta=true
+        did_keri_did = f'did:keri:{aid}'                                       # did:keri:'EHUi8qUknNeLBYtZ_tUwuLjlaRm-srp2PqVBO5YEJ4PA'
+        did_json_url = f'http://{host}:{port}/{did_path}/{aid}/did.json'       # http://127.0.0.1:7677/dws/'EHUi8qUknNeLBYtZ_tUwuLjlaRm-srp2PqVBO5YEJ4PA'/did.json?meta=true
+        keri_cesr_url = f'http://{host}:{port}/{did_path}/{aid}/keri.cesr'     # http://127.0.0.1:7677/dws/'EHUi8qUknNeLBYtZ_tUwuLjlaRm-srp2PqVBO5YEJ4PA'/keri.cesr
         # fmt: on
 
         schema_json = conftest.Schema.designated_aliases_schema()
         rules_json = conftest.Schema.designated_aliases_rules()
         subject_data = self_attested_aliases_cred_subj(host, aid, port, did_path)
-        regery = credentialing.Regery(hby=ck_hby, name=ck_hby.name, temp=ck_hby.temp)
+        regery = credentialing.Regery(hby=dgt_hby, name=dgt_hby.name, temp=dgt_hby.temp)
         CredentialHelpers.add_cred_to_aid(
-            hby=ck_hby,
-            hby_doer=ck_hby_doer,
-            hab=cracker_1_hab,
+            hby=dgt_hby,
+            hby_doer=dgt_hby_doer,
+            hab=dgt_hab,
             regery=regery,
             schema_said='EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5',  # Designated Aliases Public Schema
             schema_json=schema_json,
@@ -145,33 +216,33 @@ def test_resolver_with_witnesses():
             rules_json=rules_json,
             recp=None,  # No recipient for self-attested credential
             registry_nonce=registry_nonce,
-            additional_deeds=wit_deeds + ck1_deeds,
+            additional_deeds=wit_deeds + dgt_deeds,
         )
 
         # get keri.cesr
         reger = regery.reger
         keri_cesr = bytearray()
-        keri_cesr.extend(artifacting.gen_kel_cesr(cracker_1_hab, aid))  # add KEL CESR stream
-        keri_cesr.extend(artifacting.gen_loc_schemes_cesr(cracker_1_hab, aid))
-        keri_cesr.extend(artifacting.gen_des_aliases_cesr(cracker_1_hab, reger, aid))
+        keri_cesr.extend(artifacting.gen_kel_cesr(dgt_hab, aid))  # add KEL CESR stream
+        keri_cesr.extend(artifacting.gen_loc_schemes_cesr(dgt_hab, aid))
+        keri_cesr.extend(artifacting.gen_des_aliases_cesr(dgt_hab, reger, aid))
 
-        did_webs_diddoc = didding.generate_did_doc(ck_hby, rgy=regery, did=did_webs_did, aid=aid, meta=meta)
+        did_webs_diddoc = didding.generate_did_doc(dgt_hby, rgy=regery, did=did_webs_did, aid=aid, meta=meta)
         assert did_webs_diddoc[didding.DD_FIELD]['alsoKnownAs'] != [], 'alsoKnownAs field should contain designated aliases'
 
         # generate DID artifacts and store them locally so I can resolve them.
         output_dir = f'./tests/artifact_output_dir/{did_path}'
         did_art_gen = generating.DIDArtifactGenerator(
-            name=ck_hby.name,
-            base=ck_hby.base,
+            name=dgt_hby.name,
+            base=dgt_hby.base,
             bran=None,
-            hby=ck_hby,
-            hby_doer=ck_hby_doer,
+            hby=dgt_hby,
+            hby_doer=dgt_hby_doer,
             regery=regery,
             did=did_webs_did,
             meta=meta,
             output_dir=output_dir,
             verbose=True,
-            cf=ckr_cf,
+            cf=delegate_cf,
         )
         doist.do([did_art_gen])
 
@@ -193,7 +264,7 @@ def test_resolver_with_witnesses():
         client, client_doer = requesting.create_http_client(method='GET', url=f'{did_json_url}')
         resolution_deed = doist.enter(doers=[client_doer])
         while client.responses is None or len(client.responses) == 0:
-            doist.recur(deeds=ck1_deeds + resolver_deeds + resolution_deed)
+            doist.recur(deeds=dgt_deeds + resolver_deeds + resolution_deed)
         resp = client.respond()
         resp_body = bytes(resp.body)
         did_webs_diddoc[didding.DD_FIELD] = didding.to_did_web(did_webs_diddoc[didding.DD_FIELD])
@@ -220,7 +291,7 @@ def test_resolver_with_witnesses():
         client, client_doer = requesting.create_http_client(method='GET', url=did_keri_url)
         resolution_deed = doist.enter(doers=[client_doer])
         while client.responses is None or len(client.responses) == 0:
-            doist.recur(deeds=ck1_deeds + resolver_deeds + resolution_deed)
+            doist.recur(deeds=dgt_deeds + resolver_deeds + resolution_deed)
         stop_event.set()  # end witness thread since response is received
         wit_thread.join()  # clean up the witness thread
 
@@ -240,7 +311,7 @@ def test_resolver_with_witnesses():
         client, client_doer = requesting.create_http_client(method='GET', url=did_dud_url)
         resolution_deed = doist.enter(doers=[client_doer])
         while client.responses is None or len(client.responses) == 0:
-            doist.recur(deeds=ck1_deeds + resolver_deeds + resolution_deed)
+            doist.recur(deeds=dgt_deeds + resolver_deeds + resolution_deed)
         rep = client.respond()
         assert rep.status == 400
         resp_body = json.loads(rep.body)
