@@ -3,7 +3,7 @@
 A DID resolver for did:webs and did:keri DIDs also compatible with the Universal Resolver.
 
 A demonstration of a `did:webs` service and resolver. Implements the
-`did:webs` [specification](https://trustoverip.github.io/tswg-did-method-webs-specification/).
+`did:webs` [specification](https://trustoverip.github.io/kswg-did-method-webs-specification/).
 
 [![CI](https://github.com/GLEIF-IT/did-webs-resolver/actions/workflows/ci.yml/badge.svg)](https://github.com/GLEIF-IT/did-webs-resolver/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/GLEIF-IT/did-webs-resolver/branch/main/graph/badge.svg?token=sUADtbanWC)](https://codecov.io/gh/GLEIF-IT/did-webs-resolver)
