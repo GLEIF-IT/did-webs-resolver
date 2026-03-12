@@ -241,7 +241,7 @@ def test_resolver_with_witnesses():
             did=did_webs_did,
             meta=meta,
             output_dir=output_dir,
-            verbose=True,
+            verbose=False,
             cf=delegate_cf,
         )
         doist.do([did_art_gen])
@@ -610,6 +610,36 @@ def test_compare_dicts_returns_differences_when_present():
     assert diff == [('', exp, act)], 'Differences not identified correctly when comparing lists of different lengths'
 
 
+def test_diff_dicts_on_simple_value_works():
+    # tests simple value check that is different
+    exp = 1
+    act = 2
+    diff = resolving.diff_dicts(exp, act)
+    assert diff == [('', exp, act)]
+
+    exp = 1
+    act = 1
+    diff = resolving.diff_dicts(exp, act)
+    assert diff == []
+
+
+def test_load_ends_with_no_static_files_dir_does_not_serve_artifacts():
+    app = resolving.falcon_app()
+    hby = MagicMock()
+    rgy = MagicMock()
+    oobiery = MagicMock()
+    with patch('dws.core.resolving.serve_artifacts') as serve_artifacts:
+        resolving.load_ends(
+            app=app,
+            hby=hby,
+            rgy=rgy,
+            oobiery=oobiery,
+            static_files_dir=None,
+            did_path='dws',
+        )
+        serve_artifacts.assert_not_called()
+
+
 def test_get_serve_dir():
     with tempfile.TemporaryDirectory() as temp_static:
         dir = resolving.get_serve_dir(temp_static, 'dws')
@@ -882,7 +912,7 @@ def test_universal_resolver_resource_on_get_error_cases():
         resolver_end.on_get(mock(), rep, did)
         assert rep.status == falcon.HTTP_400, 'Expected HTTP 400 Bad Request for invalid DID'
         assert rep.content_type == 'application/json', 'Content-Type should be application/problem+json'
-        assert rep.media == {'message': f'invalid DID: {did}', 'error': '1234567 is an invalid AID'}
+        assert rep.media == {'message': f'invalid DID: {did}', 'error': 'did:webs:127.0.0.1:1234567 is missing an AID'}
 
         # Get with no DID returns error
         rep = client.simulate_get(f'/1.0/identifiers/')

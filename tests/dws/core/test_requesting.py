@@ -22,19 +22,19 @@ def test_load_url_with_requests_fails_on_connection_error():
             requests.exceptions.ConnectionError('Connection failed'),
         ]
         with pytest.raises(ArtifactResolveError) as excinfo:
-            requesting.load_url_with_requests('http://example.com')
+            requesting.load_url_with_requests('http://192.0.2.1')
         assert 'Failed to connect to HTTP URL' in str(excinfo.value), 'Expected error message for ArtifactResolveError'
 
         mock_get.side_effect = Exception('Unexpected error')
         with pytest.raises(ArtifactResolveError) as excinfo:
-            requesting.load_url_with_requests('http://example.com')
+            requesting.load_url_with_requests('http://192.0.2.1')
         assert 'Failed to load HTTP URL' in str(excinfo.value), 'Expected error message for ArtifactResolveError'
 
     with patch('requests.get') as mock_get:
         # mock returning a byte array in response.content
         mock_get.return_value.content = b'{"key": "value"}'
         mock_get.return_value.status_code = 200
-        result = requesting.load_url_with_requests('http://example.com')
+        result = requesting.load_url_with_requests('http://192.0.2.1')
         assert result == b'{"key": "value"}', 'Expected byte array response from mocked requests.get'
 
     with patch('requests.get') as mock_get:
@@ -44,7 +44,7 @@ def test_load_url_with_requests_fails_on_connection_error():
         ]
 
         # Test giving HTTP URL tries with HTTPS first, fails, and then falls back to HTTP
-        result = requesting.load_url_with_requests('http://example.com')
+        result = requesting.load_url_with_requests('http://192.0.2.1')
         assert result == b'{"key": "value"}', 'Expected byte array response from mocked requests.get after fallback'
 
         # Test when HTTPS fails and HTTP throws a connection error

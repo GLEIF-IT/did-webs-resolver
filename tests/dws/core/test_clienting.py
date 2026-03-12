@@ -28,7 +28,7 @@ def test_load_url_with_hio_invalid_url_throws():
 
 
 def test_create_http_client_with_body_encodes():
-    url = 'http://example.com/api'
+    url = 'http://192.0.2.1/api'
     body = json.dumps({'key': 'value'})
     headers = {'Content-Type': 'application/json'}
     client, client_doer = requesting.create_http_client('POST', url, body=body, headers=headers)
@@ -45,7 +45,9 @@ def test_create_http_client_with_body_encodes():
 
 
 def test_load_url_with_hio_timeout_causes_hio_error():
-    bad_url = 'https://example.com/oobi/EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5/'
+    # Use RFC 5737 TEST-NET address (192.0.2.0/24) - not routed, connection hangs.
+    # example.com responds quickly (404), causing intermittent test failure.
+    bad_url = 'http://192.0.2.1/oobi/EN6Oh5XSD5_q2Hgu-aqpdfbVepdpYpFlgz6zvJL5b_r5/'
     with pytest.raises(ArtifactResolveError) as exc_info:
         requesting.load_url_with_hio(bad_url, timeout=0.1)
     assert 'Failed to load URL' in str(exc_info.value), 'Should raise HioError on timeout'

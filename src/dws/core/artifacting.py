@@ -5,13 +5,15 @@ import vgate
 from hio.core import http
 from keri import kering
 from keri.app import habbing, signing
-from keri.app.habbing import Habery
-from keri.core import serdering
+from keri.app.habbing import Hab, Habery
+from keri.core.serdering import SerderACDC
 from keri.vdr import credentialing, viring
 from keri.vdr.credentialing import Regery
+from keri.vdr.viring import Reger
 
 from dws import UnknownAID, log_name, ogler
 from dws.core import didding, ends, resolving, webbing
+from dws.core.didding import DES_ALIASES_SCHEMA
 
 logger = ogler.getLogger(log_name)
 
@@ -61,7 +63,7 @@ def gen_tel_cesr(reger: viring.Reger, evt_pre: str) -> bytearray:
     return msgs
 
 
-def gen_acdc_cesr(hab: habbing.Hab, reger: credentialing.Reger, creder: serdering.SerderACDC) -> bytearray:
+def gen_acdc_cesr(hab: Hab, reger: Reger, creder: SerderACDC) -> bytearray:
     """
     Add the CESR stream of the self attestation ACDCs for the given AID including signatures
     and their anchors to their source KELs.
@@ -72,9 +74,7 @@ def gen_acdc_cesr(hab: habbing.Hab, reger: credentialing.Reger, creder: serderin
     return arr
 
 
-def gen_des_aliases_cesr(
-    hab: habbing.Hab, reger: credentialing.Reger, aid: str, schema: str = didding.DES_ALIASES_SCHEMA
-) -> bytearray:
+def gen_des_aliases_cesr(hab: Hab, reger: Reger, aid: str, schema: str = DES_ALIASES_SCHEMA) -> bytearray:
     """
     Select a specific ACDC from the local registry (Regery), if it exists, to generate the
     CESR stream
@@ -90,15 +90,20 @@ def gen_des_aliases_cesr(
     # self-attested, there is no issuee, and schema is designated aliases
     local_creds = get_self_issued_acdcs(aid, reger, schema)
 
-    msgs = bytearray()
+    cesr_bytes = bytearray()
     for cred in local_creds:
         creder, *_ = reger.cloneCred(said=cred.qb64)
-        if creder.regi is not None:
-            # TODO check if this works if we only get the regi CESR stream once
-            msgs.extend(gen_tel_cesr(reger, creder.regi))
-            msgs.extend(gen_tel_cesr(reger, creder.said))
-        msgs.extend(gen_acdc_cesr(hab, reger, creder))
-    return msgs
+        cesr_bytes.extend(add_cred_cesr_bytes(creder, hab, reger))
+    return cesr_bytes
+
+
+def add_cred_cesr_bytes(creder: SerderACDC, hab: Hab, reger: Reger) -> bytearray:
+    """Add one ACDC credential bytes to the CESR stream"""
+    creder_bytes = bytearray()
+    creder_bytes.extend(gen_tel_cesr(reger, creder.regi))
+    creder_bytes.extend(gen_tel_cesr(reger, creder.said))
+    creder_bytes.extend(gen_acdc_cesr(hab, reger, creder))
+    return creder_bytes
 
 
 def get_witness_loc_scheme_bytes(hab: habbing.Hab, wit_prefixes: list[str], scheme: str = '') -> bytearray:
@@ -148,8 +153,6 @@ def gen_loc_schemes_cesr(hab: habbing.Hab, aid: str, role: str = None, scheme=''
     """
     Generates a CESR stream of all location scheme record reply 'rpy' messages for a given AID based on
     the witness location scheme and endpoint role records in the local Hab's database.
-
-    TODO handle agent and mailbox roles to get their location schemes and add them to the msgs.
 
     Returns:
         bytearray: CESR stream of location scheme and endpoint role records for the given AID and role.
