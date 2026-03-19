@@ -863,6 +863,48 @@ def test_re_encode_valid_did_webs_did_returns_original_did():
     assert result == valid_did, f'Expected {valid_did}, but got {result}'
 
 
+def test_re_encode_invalid_no_aid_did_webs_throws():
+    no_aid = f'did:webs:127.0.0.1:7676'
+    with pytest.raises(ValueError) as excinfo:
+        didding.re_encode_invalid_did_webs(no_aid)
+        assert str(excinfo.value) == f'{no_aid} is missing an AID'
+
+
+@pytest.mark.parametrize(
+    'invalid_did,expected_did',
+    [
+        # no port, no path, no query
+        (
+            'did:webs:example.com:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4',
+            'did:webs:example.com:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4',
+        ),
+        # port only
+        (
+            'did:webs:example.com:8443:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4',
+            'did:webs:example.com%3A8443:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4',
+        ),
+        # path only
+        (
+            'did:webs:example.com:my:path:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4',
+            'did:webs:example.com:my:path:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4',
+        ),
+        # query only
+        (
+            'did:webs:example.com:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4?meta=true',
+            'did:webs:example.com:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4?meta=true',
+        ),
+        # port + path + query
+        (
+            'did:webs:example.com:8443:my:path:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4?meta=true',
+            'did:webs:example.com%3A8443:my:path:EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4?meta=true',
+        ),
+    ],
+)
+def test_re_encode_invalid_did_webs_optional_parts(invalid_did, expected_did):
+    result = didding.re_encode_invalid_did_webs(invalid_did)
+    assert result == expected_did, f'Expected {expected_did}, but got {result}'
+
+
 def test_re_encode_invalid_did_non_webs_raises():
     invalid_did = 'did:example:123'
     with pytest.raises(ValueError) as excinfo:

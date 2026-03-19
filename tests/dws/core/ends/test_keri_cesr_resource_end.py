@@ -8,6 +8,7 @@ from keri.vdr import credentialing
 from mockito import mock, when
 
 from dws.core import didding
+from dws.core.artifacting import gen_loc_schemes_cesr
 from dws.core.ends.keri_cesr_resource_end import KeriCesrResourceEnd
 
 
@@ -145,6 +146,41 @@ def test_keri_cesr_resource_end_on_get_single_sig():
         b'"a":{"cid":"EKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4","role":"witness","eid":"BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha"}}'
         b'-VA0-FABEKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk40AAAAAAAAAAAAAAAAAAAAAAAEKYLUMmNPZeEs77Zvclf0bSN5IN-mLfLpx2ySb-HDlk4-AABAAAsb68BJ6XGB77xP37tPiDjZOd6oB4nxshznxz6GMy1dTmvpi5yltfvTpBNLZQYlhpRzUI3K0GD_4DNTiUldHAL'
         b'{"r":"/loc/scheme","a":{"eid":"BDilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha","scheme":"tcp","url":"tcp://127.0.0.1:5632/"}}'
+        b'{"r":"/end/role/add","a":{"eid":"BDilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha","role":"mailbox","cid":"test_aid"}}'
+    )
+
+
+def test_gen_loc_schemes_cesr_with_mailbox_role_skips_agent():
+    hab = mock()
+    hab.kever = mock()
+    kever = mock(eventing.Kever)
+    hab.kevers = {'test_aid': kever}
+    # hab.kever.wits = ['BBilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha']
+
+    hab.db = mock(basing.Baser)
+    hab.db.ends = mock(koming.Komer)
+
+    when(hab.db.ends).getItemIter(keys=('test_aid', kering.Roles.mailbox)).thenReturn(
+        [((None, 'mailbox', 'BDilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha'), None)]
+    )
+
+    when(hab).loadLocScheme(eid='BDilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha').thenReturn(
+        bytearray(
+            b'{"r":"/loc/scheme","a":{"eid":"BDilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha","scheme":"tcp","url":"tcp://127.0.0.1:5632/"}}'
+        )
+    )
+
+    when(hab).loadEndRole(
+        cid='test_aid', eid='BDilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha', role=kering.Roles.mailbox
+    ).thenReturn(
+        bytearray(
+            b'{"r":"/end/role/add","a":{"eid":"BDilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha","role":"mailbox","cid":"test_aid"}}'
+        )
+    )
+    loc_scheme_cesr = gen_loc_schemes_cesr(hab, 'test_aid', role=kering.Roles.mailbox)
+    assert (
+        loc_scheme_cesr
+        == b'{"r":"/loc/scheme","a":{"eid":"BDilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha","scheme":"tcp","url":"tcp://127.0.0.1:5632/"}}'
         b'{"r":"/end/role/add","a":{"eid":"BDilc4-L3tFUnfM_wJr4S4OJanAv_VmF_dJNN6vkf2Ha","role":"mailbox","cid":"test_aid"}}'
     )
 

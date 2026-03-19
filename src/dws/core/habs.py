@@ -29,7 +29,7 @@ def get_habery_and_doer(
     name: str | None, base: str | None, bran: str | None, cf: configing.Configer = None, temp: bool = False
 ) -> (habbing.Habery, habbing.HaberyDoer):
     """Get the Habery and its Doer respecting any existing AEID."""
-    aeid = get_auth_encryption_aid(name, base)
+    aeid = get_auth_encryption_aid(name, base, temp)
     if aeid is None:
         hby = habbing.Habery(name=name, base=base, bran=bran, cf=cf, temp=temp)
     else:

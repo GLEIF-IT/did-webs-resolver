@@ -50,6 +50,17 @@ DID_WEBS_UNENCODED_PORT_RE = re.compile(
     flags=re.IGNORECASE,
 )
 
+# Detects the malformed shape:
+#   did:webs:<domain>:<port>[?<query>]
+# where <port> is unencoded (":" not "%3A") and the required AID segment is absent.
+NO_AID_UNENCODED_PORT_RE = re.compile(
+    pattern=r'\Adid:web(s)?:'
+    r'(?P<domain>[^%:]+)'
+    r':(?P<port>\d+)'
+    r'(?P<query>\?.*)?\Z',
+    flags=re.IGNORECASE,
+)
+
 DID_TIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 DID_TIME_PATTERN = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z')
 
@@ -125,6 +136,14 @@ def parse_query_string(query: str) -> dict:
 
 
 def re_encode_invalid_did_webs(did: str):
+    """
+    Normalizes did:webs strings that arrive with an unencoded domain/port separator (:<port>) by
+    re-encoding it as %3A, while preserving path, AID, and query. This compensates for URL path
+    quote/unquote handling in the Falcon/HIO WSGI request path.
+    """
+    if NO_AID_UNENCODED_PORT_RE.match(did):
+        raise ValueError(f'{did} is missing an AID')
+
     match = DID_WEBS_UNENCODED_PORT_RE.match(did)
     if match is None:
         match = DID_WEBS_RE.match(did)
@@ -134,19 +153,18 @@ def re_encode_invalid_did_webs(did: str):
 
     domain, port, path, aid, query = match.group('domain', 'port', 'path', 'aid', 'query')
 
-    if aid:
-        try:
-            _ = coring.Prefixer(qb64=aid)
-        except Exception as e:
-            raise ValueError(f'{aid} is an invalid AID')
+    try:
+        _ = coring.Prefixer(qb64=aid)
+    except Exception as e:
+        raise ValueError(f'{aid} is an invalid AID')
 
     encoded = f'did:webs:{domain}'
     if port:
         encoded += f'%3A{port}'
     if path:
         encoded += f':{path}'
-    if aid:
-        encoded += f':{aid}'
+    # always add the AID
+    encoded += f':{aid}'
     if query:
         encoded += f'{query}'
     return encoded

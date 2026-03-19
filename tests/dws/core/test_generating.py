@@ -157,11 +157,11 @@ def test_did_art_genr_with_empty_hby_creates_hby():
     rgy_mock = mock(credentialing.Regery)
     with patch('dws.core.habs.get_habery_and_doer') as mock_get_habery_and_doer:
         mock_get_habery_and_doer.return_value = hby_mock, hby_doer_mock
-        resolver = generating.DIDArtifactGenerator(
+        gen = generating.DIDArtifactGenerator(
             name='test_resolver', base='test_base', bran=None, did='fake:did', regery=rgy_mock
         )
-        assert resolver.hby == hby_mock, 'Expected KeriResolver to create a new Habery instance'
-        assert hby_doer_mock in resolver.doers, 'Expected KeriResolver to add HaberyDoer to its doers'
+        assert gen.hby == hby_mock, 'Expected KeriResolver to create a new Habery instance'
+        assert hby_doer_mock in gen.doers, 'Expected KeriResolver to add HaberyDoer to its doers'
 
 
 @pytest.fixture

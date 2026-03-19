@@ -155,8 +155,7 @@ def error_resolution_response(error_message: str, differences: list) -> dict:
     """
     resolution = dict()  # Copy the actual DID document to modify it
     resolution[didding.DD_FIELD] = None
-    if didding.DID_RES_META_FIELD not in resolution:
-        resolution[didding.DID_RES_META_FIELD] = dict()
+    resolution[didding.DID_RES_META_FIELD] = dict()
     resolution[didding.DID_RES_META_FIELD]['error'] = 'notVerified'
     resolution[didding.DID_RES_META_FIELD]['errorMessage'] = error_message
     resolution[didding.DID_RES_META_FIELD]['differences'] = differences
@@ -445,12 +444,11 @@ def get_serve_dir(static_files_dir: str | None, did_doc_dir: str):
 
 def serve_artifacts(app: falcon.App, hby: habbing.Habery, static_files_dir: str | None = None, did_path: str = ''):
     """Configures a Falcon HTTP server with a static file server for did.json and keri.cesr files based on a local directory."""
-    if static_files_dir is not None:
-        did_doc_dir = get_serve_dir(static_files_dir, hby.cf.get().get('did.doc.dir', ''))
-        route = '' if did_path is None else f'/{did_path}'
-        logger.info(f'Serving static files from {did_doc_dir} at route {route}')
-        # Host did:webs artifacts only if static path specified
-        app.add_static_route(route, did_doc_dir)
+    did_doc_dir = get_serve_dir(static_files_dir, hby.cf.get().get('did.doc.dir', ''))
+    route = '' if did_path is None else f'/{did_path}'
+    logger.info(f'Serving static files from {did_doc_dir} at route {route}')
+    # Host did:webs artifacts only if static path specified
+    app.add_static_route(route, did_doc_dir)
 
 
 def load_ends(
@@ -462,7 +460,8 @@ def load_ends(
     did_path: str = '',
 ):
     """Set up Falcon HTTP server endpoints for resolving DIDs and hosting static files"""
-    serve_artifacts(app, hby, static_files_dir, did_path)
+    if static_files_dir is not None:
+        serve_artifacts(app, hby, static_files_dir, did_path)
     resolve_end = UniversalResolverResource(hby=hby, rgy=rgy, oobiery=oobiery, load_url=requesting.load_url_with_requests)
     app.add_route('/1.0/identifiers/{did}', resolve_end)
     app.add_route('/health', ends.HealthEnd())
