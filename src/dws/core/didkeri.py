@@ -91,7 +91,7 @@ class KeriResolver(doing.DoDoer):
                 raise kering.KeriError(f'OOBI resolution timed out after {self.TimeoutOOBIResolve} seconds for OOBI: {oobi}')
             _ = yield tock
 
-    def resolve(self, hby: habbing.Habery, did: str, oobi: str, meta: bool, tock=0.0, tymth=None):
+    def resolve(self, hby: habbing.Habery, did: str, oobi: str, meta: bool, tock=0.0, tymth=None, **opts):
         """
         Resolve the did:keri DID document by retrieving the KEL from the OOBI resolution.
         """

@@ -2,6 +2,14 @@
 
 ## Version History
 
+### 0.3.8 Use the GLEIF KERI 1.2.18 security release
+
+Upgrade to `gleif_keri==1.2.18` and `gleif_hio==0.6.22`, carrying the
+delegated-rotation replay correction, current Python dependency security floors,
+and maintained HTTP connection cleanup into the resolver. Build the service
+images from the matching immutable KERI base and version the dependent images
+together.
+
 ### 0.3.7 Upgrade KERIpy to 1.2.13
 
 There was an important LMDB bugfix in KERIpy 1.2.13 that we pull in here.

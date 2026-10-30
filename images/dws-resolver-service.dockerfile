@@ -1,4 +1,4 @@
-FROM gleif/dws-base:latest
+FROM gleif/dws-base:0.3.8
 # This image runs the did:webs and did:keri resolver. The local controller AID does not matter
 # very much as it is only used to run the local keystore, not to sign anything.
 # the "dws" keystore can be replaced with any other name, yet it should match the name of the

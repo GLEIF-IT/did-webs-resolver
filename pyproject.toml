@@ -1,6 +1,6 @@
 [project]
 name = "did-webs-resolver"
-version = "0.3.7" # also change in src/dws/__init__.py and Makefile
+version = "0.3.8" # also change in src/dws/__init__.py and Makefile
 description = "did:webs DID Method Resolver"
 readme = "README.md"
 requires-python = ">=3.12.6,<3.14"
@@ -12,7 +12,8 @@ authors = [
 keywords = ["did:webs", "did", "resolver", "webs", "keri", "acdc", "cesr", "vlei"]
 
 dependencies = [
-    "keri>=1.2.13,<1.3",
+    "gleif_keri==1.2.19",
+    "gleif_hio==0.6.22",
     "multicommand>=1.0.0",
     "falcon>=4.2.0",
     "requests>=2.33.1"

@@ -1,4 +1,4 @@
-__version__ = '0.3.7'  # also change in pyproject.toml and Makefile
+__version__ = '0.3.8'  # also change in pyproject.toml and Makefile
 
 # Logging config
 import logging

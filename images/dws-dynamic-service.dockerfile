@@ -1,4 +1,4 @@
-FROM gleif/dws-base:latest
+FROM gleif/dws-base:0.3.8
 # This image runs the did:webs and did:keri dynamic asset generator and webserver of did.json and keri.cesr files.
 # The local controller AID matters because it is used to generate the did.json and keri.cesr files.
 

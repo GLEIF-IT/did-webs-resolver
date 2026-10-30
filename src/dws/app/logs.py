@@ -1,4 +1,5 @@
 import logging
+from copy import copy
 
 
 class TruncatedFormatter(logging.Formatter):
@@ -9,6 +10,8 @@ class TruncatedFormatter(logging.Formatter):
 
     def format(self, record):
         """Format the log record with truncated module and function names."""
+        # Other handlers receive the same LogRecord; format a private copy.
+        record = copy(record)
         # Truncate module and funcName to first 'chars' characters
         mod_chars = 10  # number of spaces to truncate to
         fn_chars = 14  # number of spaces to truncate to

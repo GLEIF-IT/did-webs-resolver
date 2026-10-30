@@ -1,0 +1,7 @@
+.git
+.pytest_cache
+.ruff_cache
+.venv
+dist
+**/__pycache__
+tests/artifact_output_dir

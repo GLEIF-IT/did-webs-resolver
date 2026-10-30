@@ -46,3 +46,16 @@ def test_truncated_formatter():
                 sinfo=None,
             )
         )
+
+
+def test_truncated_formatter_preserves_shared_record():
+    """Formatting for one handler must preserve fields used by later handlers."""
+    import logging
+
+    from dws.app.logs import TruncatedFormatter
+
+    record = logging.LogRecord('test', logging.INFO, __file__, 42, 'hello', (), None, 'long_function_name')
+    original = record.__dict__.copy()
+    TruncatedFormatter(log_format_str).format(record)
+    assert record.__dict__ == original
+    assert logging.Formatter('%(lineno)d %(funcName)s').format(record) == '42 long_function_name'

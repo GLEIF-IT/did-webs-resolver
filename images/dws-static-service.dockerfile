@@ -1,4 +1,4 @@
-FROM gleif/dws-base:latest
+FROM gleif/dws-base:0.3.8
 # This image runs the did:webs and did:keri resolver as a static web asset host of did.json and keri.cesr files.
 # The local controller AID does not matter as it is only used to run the static webserver.
 # the "dws" keystore can be replaced with any other name.

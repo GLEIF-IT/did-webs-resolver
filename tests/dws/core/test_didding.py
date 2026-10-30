@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 from hio.help.hicting import Mict
-from keri.app import habbing
+from keri.app import habbing, tocking
 from keri.core import coring, eventing, serdering
 from keri.db import basing, koming, subing
 from keri.vdr import credentialing, verifying
@@ -985,6 +985,7 @@ def test_extract_desg_alias_from_cred_rev_status_returns_none():
 
 def test_keri_resolver_with_empty_hby_creates_hby():
     hby_mock = mock(habbing.Habery)
+    hby_mock.tocks = tocking.resolveTocks()
     hby_mock.db = mock(basing.Baser)
     hby_doer_mock = mock(habbing.HaberyDoer)
     rgy_mock = mock(credentialing.Regery)

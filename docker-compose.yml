@@ -18,7 +18,7 @@ volumes:
 services:
     # Witnesses used for the AID controller
     witnesses:
-        image: gleif/keri:1.2.8
+        image: gleif/keri:1.2.18@sha256:dcf31bdbff69cbb5d69abbedebdcf6c203bfdbb95f5f582432b2d6359e331793
         container_name: witnesses
         hostname: witnesses
         platform: linux/amd64
@@ -40,7 +40,7 @@ services:
 
     # Generates did.json and keri.cesr files
     artifact-generator:
-        image: gleif/dws-base:latest
+        image: gleif/dws-base:0.3.8
         container_name: gen
         hostname: gen
         environment:
@@ -62,7 +62,7 @@ services:
 
     # Hosts the did.json and keri.cesr files on behalf of the AID controller dws-controller
     dws-static-service:
-        image: gleif/did-webs-resolver-service:latest
+        image: gleif/did-webs-resolver-service:0.3.8
         container_name: dws-static-server
         hostname: dws-static-server
         environment:
@@ -99,7 +99,7 @@ services:
         ]
 
     dws-dynamic-service:
-        image: gleif/did-webs-service:latest
+        image: gleif/did-webs-service:0.3.8
         container_name: dws-service
         hostname: dws-service
         build:
@@ -135,7 +135,7 @@ services:
 
     # Main resolver service that can hit either of the static or dynamic did:webs artifact hosts
     dws-resolver:
-        image: gleif/did-webs-resolver-service:latest
+        image: gleif/did-webs-resolver-service:0.3.8
         container_name: dws-resolver
         hostname: dws-resolver
         environment:
@@ -165,7 +165,7 @@ services:
         entrypoint: /dws/resolver-init.sh
 
     resolver-test:
-        image: gleif/dws-base:latest # depends on dws-base built above
+        image: gleif/dws-base:0.3.8 # depends on dws-base built above
         container_name: resolver-test
         hostname: resolver-test
         environment:

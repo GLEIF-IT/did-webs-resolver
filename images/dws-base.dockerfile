@@ -1,32 +1,19 @@
-FROM python:3.12.6-alpine3.20
+ARG KERI_IMAGE=gleif/keri:1.2.19@sha256:a46ecb85e6210f8340465d7423195cad2a550cdff83e0dfdfa50b07062bc5e76
+FROM ${KERI_IMAGE} AS builder
 
-# Development deps needed so KERIpy can see libsodium (dynamically linked at runtime)
-RUN apk --no-cache add \
-    curl \
-    jq \
-    bash \
-    alpine-sdk \
-    libsodium-dev
-
-# Add uv build tool
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-
-# Copy in KERIpy from weboftrust image
-COPY --from=weboftrust/keri:1.2.13 /keripy /keripy
-COPY --from=weboftrust/keri:1.2.13 /keripy/src /keripy/src
-
-ENV PATH="/keripy/venv/bin:${PATH}"
-# Ignore the syntax warning for KERIpy's old regex usage
-ENV PYTHONWARNINGS="ignore::SyntaxWarning"
-
-RUN mkdir /dws
-
+COPY --from=ghcr.io/astral-sh/uv:0.9.5 /uv /bin/uv
+RUN apk add --no-cache build-base patch
 WORKDIR /dws
+COPY pyproject.toml uv.lock README.md ./
+RUN uv sync --locked --no-dev --no-editable --no-install-project
+COPY src/ src/
+RUN uv sync --locked --no-dev --no-editable
 
+FROM ${KERI_IMAGE}
+RUN apk add --no-cache curl jq
+WORKDIR /dws
 COPY . /dws
-
-# Install dws - did KERI resolver
-RUN uv lock && \
-    uv sync --locked
-
+COPY --from=builder /dws/.venv /dws/.venv
 ENV PATH="/dws/.venv/bin:$PATH"
+ENV PYTHONWARNINGS="ignore::SyntaxWarning"
+ENTRYPOINT []

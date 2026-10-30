@@ -8,7 +8,7 @@ import falcon
 import pytest
 from hio.base import doing
 from keri import core
-from keri.app import configing, habbing, oobiing
+from keri.app import configing, habbing, oobiing, tocking
 from keri.vdr import credentialing
 from mockito import mock
 
@@ -152,6 +152,7 @@ def test_artifact_generation_creates_expected_artifacts():
 
 def test_did_art_genr_with_empty_hby_creates_hby():
     hby_mock = mock(habbing.Habery)
+    hby_mock.tocks = tocking.resolveTocks()
     hby_mock.db = mock()
     hby_doer_mock = mock(habbing.HaberyDoer)
     rgy_mock = mock(credentialing.Regery)
